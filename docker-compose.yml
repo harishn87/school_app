@@ -1,0 +1,41 @@
+# Local stack: MongoDB + backend + frontend (Nginx serves the app and proxies /api).
+#   docker compose up --build
+#   App:       http://localhost:3000   demo school code "demo", admin@school.com / admin123
+#   Console:   http://localhost:3000/platform/login   owner@example.com / OwnerPass#2026
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      ENV: development
+      MONGO_URL: mongodb://mongo:27017
+      JWT_SECRET: local-dev-secret-change-me
+      SUPERADMIN_EMAIL: owner@example.com
+      SUPERADMIN_PASSWORD: "OwnerPass#2026"
+      SEED_DEMO: "true"
+      CORS_ORIGINS: http://localhost:3000
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
+volumes:
+  mongo-data:

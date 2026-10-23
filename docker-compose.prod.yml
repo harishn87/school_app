@@ -1,0 +1,72 @@
+# Production stack: Caddy (automatic HTTPS) -> Nginx (app + /api proxy) -> FastAPI -> MongoDB
+#
+#   cp deploy/production.env.example deploy/production.env   # then fill in real values
+#   docker compose -f docker-compose.prod.yml --env-file deploy/production.env up -d --build
+#
+# Only ports 80/443 are exposed. MongoDB is reachable only inside the Docker network.
+services:
+  mongo:
+    image: mongo:7
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "${MONGO_ROOT_USER}", "-p", "${MONGO_ROOT_PASSWORD}", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+
+  backend:
+    build: ./backend
+    restart: always
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      ENV: production
+      MONGO_URL: mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      JWT_SECRET: ${JWT_SECRET}
+      COOKIE_SECURE: "true"
+      CORS_ORIGINS: https://${DOMAIN}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD}
+      TRIAL_DAYS: ${TRIAL_DAYS:-14}
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      SEED_DEMO: "false"
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
+    logging: *logging
+
+  frontend:
+    build: ./frontend
+    restart: always
+    depends_on:
+      - backend
+    logging: *logging
+
+  caddy:
+    image: caddy:2-alpine
+    restart: always
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    logging: *logging
+
+volumes:
+  mongo-data:
+  caddy-data:
+  caddy-config:

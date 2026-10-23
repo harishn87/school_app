@@ -1,0 +1,93 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Poppins:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 230 33% 97%;
+    --foreground: 230 50% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 230 50% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 50% 12%;
+    --primary: 231 100% 58%;             /* #2B4BFF royal */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 229 100% 95%;
+    --secondary-foreground: 231 100% 58%;
+    --muted: 228 33% 95%;
+    --muted-foreground: 226 15% 45%;
+    --accent: 229 100% 97%;
+    --accent-foreground: 231 100% 58%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 229 25% 92%;
+    --input: 229 25% 92%;
+    --ring: 231 100% 74%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  html, body, #root { height: 100%; }
+  body {
+    margin: 0;
+    background: #F5F6FA;
+    color: #0F1530;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14.5px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  h1, h2, h3, h4, h5, h6, .font-heading { font-family: 'Poppins', system-ui, sans-serif; letter-spacing: -0.02em; }
+  h1, h2, h3 { font-weight: 600; }
+  ::selection { background: #2B4BFF; color: #fff; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+}
+
+/* Soft page glow behind content */
+.bg-dots {
+  background:
+    radial-gradient(900px 420px at 85% -10%, rgba(43, 75, 255, 0.07), transparent 60%),
+    radial-gradient(700px 380px at -5% 0%, rgba(217, 164, 65, 0.06), transparent 60%),
+    #F5F6FA;
+}
+
+/* Midnight surface with a royal-blue glow (sidebar, auth, hero) */
+.surface-midnight {
+  background:
+    radial-gradient(600px 400px at 100% 0%, rgba(43, 75, 255, 0.35), transparent 60%),
+    radial-gradient(500px 360px at 0% 100%, rgba(43, 75, 255, 0.18), transparent 60%),
+    #0B1020;
+}
+
+@layer components {
+  .ui-card {
+    @apply bg-white border border-[#E7E9F1] rounded-2xl;
+    box-shadow: 0 1px 2px rgba(15, 21, 48, 0.04), 0 8px 24px -12px rgba(15, 21, 48, 0.10);
+  }
+  .ui-btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700
+           bg-white border border-[#E1E4EE] transition-all duration-150 hover:bg-slate-50 hover:border-slate-300
+           focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B4BFF]/50 focus-visible:ring-offset-2
+           disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.98];
+  }
+  .btn-primary {
+    @apply text-white border-transparent hover:border-transparent hover:text-white;
+    background: linear-gradient(180deg, #3A58FF 0%, #2340F0 100%);
+    box-shadow: 0 1px 0 rgba(255,255,255,.25) inset, 0 6px 16px -6px rgba(35, 64, 240, 0.65);
+  }
+  .btn-primary:hover { background: linear-gradient(180deg, #4A66FF 0%, #2B4BFF 100%); }
+  .btn-soft-green {
+    @apply bg-emerald-50 border-emerald-100 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-200;
+  }
+  .ui-input {
+    @apply w-full bg-white border border-[#DDE1EC] rounded-xl px-3.5 py-2.5 text-sm text-slate-900
+           placeholder:text-slate-400 transition-all
+           focus:outline-none focus:border-[#2B4BFF] focus:ring-4 focus:ring-[#2B4BFF]/10;
+  }
+  .field-label { @apply text-[13px] font-medium text-slate-600; }
+  .pill { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium; }
+  .table-head { @apply text-left text-xs font-medium text-slate-500 bg-slate-50/70 border-b border-[#E7E9F1]; }
+}
