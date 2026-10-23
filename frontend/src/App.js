@@ -16,6 +16,7 @@ import BillingPage from "@/pages/BillingPage";
 import AccountPage from "@/pages/AccountPage";
 import DiaryPage from "@/pages/DiaryPage";
 import LettersPage from "@/pages/LettersPage";
+import HolidaysPage from "@/pages/HolidaysPage";
 import TransportPage from "@/pages/TransportPage";
 import ParentHome from "@/pages/ParentHome";
 import PlatformLoginPage from "@/pages/platform/PlatformLoginPage";
@@ -72,6 +73,7 @@ export default function App() {
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="users" element={<RoleOnly roles={["admin"]}><UsersPage /></RoleOnly>} />
             <Route path="transport" element={<RoleOnly roles={["admin", "teacher"]}><TransportPage /></RoleOnly>} />
+            <Route path="holidays" element={<RoleOnly roles={["admin", "teacher"]}><HolidaysPage /></RoleOnly>} />
             <Route path="letters" element={<RoleOnly roles={["admin"]}><LettersPage /></RoleOnly>} />
             <Route path="billing" element={<RoleOnly roles={["admin"]}><BillingPage /></RoleOnly>} />
             <Route path="account" element={<AccountPage />} />

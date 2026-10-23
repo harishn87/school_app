@@ -4,6 +4,7 @@ import { api } from "@/lib/api";
 import { GraduationCap, Users, Wallet, CalendarCheck, Clock, UserMinus, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { formatMoney } from "@/lib/utils";
+import ProgressBoard from "@/components/ProgressBoard";
 
 function Ring({ pct }) {
   const r = 52, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0));
@@ -115,6 +116,8 @@ export default function DashboardHome() {
         {parent && <Small icon={Clock} label="Fees pending" value={stats.fees_pending == null ? "—" : formatMoney(pending)} testid="stat-parent_pending" tone="amber" />}
         {!parent && <Small icon={UserMinus} label="Students who left" value={n(stats.students_left)} testid="stat-students_left" tone="slate" />}
       </div>
+
+      {!parent && <ProgressBoard />}
 
       {user?.role === "admin" && loaded && !stats.total_students && (
         <div className="ui-card p-7">

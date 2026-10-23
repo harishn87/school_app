@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { fmtTime, formatDate, formatMoney } from "@/lib/utils";
 import PostCard from "@/components/PostCard";
+import MonthCalendar from "@/components/MonthCalendar";
 
 const STATUS = {
   present: ["Present today", "bg-emerald-50 text-emerald-700"],
@@ -44,6 +45,8 @@ function Child({ c }) {
           </div>
         </Link>
       </div>
+
+      <MonthCalendar studentId={c.id} />
 
       {c.transport && (
         <div className="mt-3 rounded-xl border border-[#E7E9F1] p-4" data-testid={`bus-card-${c.id}`}>

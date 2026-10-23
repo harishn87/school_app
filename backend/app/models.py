@@ -222,3 +222,10 @@ class TransportAssignIn(BaseModel):
     route_id: str
     stop: str = Field(min_length=1, max_length=100)
     mode: Literal["both", "pickup", "drop"] = "both"
+
+
+# --- Holidays & calendar ---
+class HolidayIn(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")   # for multi-day breaks

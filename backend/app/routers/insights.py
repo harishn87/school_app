@@ -1,0 +1,172 @@
+"""School holidays, the monthly attendance calendar, and the staff progress/fees dashboard."""
+import calendar as cal
+from datetime import date, datetime, timedelta, timezone
+from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from ..models import HolidayIn
+from ..security import TenantContext, get_ctx, require_roles
+from ..utils import new_id, now_iso
+from .school import fee_status, student_scope
+
+router = APIRouter(tags=["insights"])
+
+
+def _parse(d: str) -> date:
+    try:
+        return date.fromisoformat(d)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date")
+
+
+def _month_bounds(month: str):
+    try:
+        y, m = (int(x) for x in month.split("-"))
+        first = date(y, m, 1)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="Month must look like 2026-10")
+    return first, date(y, m, cal.monthrange(y, m)[1])
+
+
+# ---------- holidays ----------
+@router.get("/holidays")
+async def list_holidays(year: Optional[int] = Query(None, ge=2000, le=2100), ctx: TenantContext = Depends(get_ctx)):
+    q: dict = {}
+    if year:
+        q = {"$or": [{"date": {"$regex": f"^{year}"}}, {"end_date": {"$regex": f"^{year}"}}]}
+    return await ctx.db.holidays.find(q, {"_id": 0}).sort("date", 1).to_list(500)
+
+
+@router.post("/holidays", status_code=201)
+async def create_holiday(payload: HolidayIn, ctx: TenantContext = Depends(require_roles("admin"))):
+    start = _parse(payload.date)
+    end = _parse(payload.end_date) if payload.end_date else None
+    if end and end < start:
+        raise HTTPException(status_code=400, detail="End date can't be before the start date")
+    if end and (end - start).days > 60:
+        raise HTTPException(status_code=400, detail="A holiday can span at most 60 days")
+    doc = {"id": new_id(), "name": payload.name.strip(), "date": start.isoformat(),
+           "end_date": end.isoformat() if end and end != start else None, "created_at": now_iso()}
+    await ctx.db.holidays.insert_one(dict(doc))
+    return doc
+
+
+@router.delete("/holidays/{holiday_id}")
+async def delete_holiday(holiday_id: str, ctx: TenantContext = Depends(require_roles("admin"))):
+    res = await ctx.db.holidays.delete_one({"id": holiday_id})
+    if not res.deleted_count:
+        raise HTTPException(status_code=404, detail="Holiday not found")
+    return {"ok": True}
+
+
+async def _holiday_map(ctx: TenantContext, first: date, last: date) -> dict:
+    """date iso -> holiday name, for every day of the range that falls on a holiday."""
+    out: dict = {}
+    rows = await ctx.db.holidays.find({"date": {"$lte": last.isoformat()}}, {"_id": 0}).to_list(1000)
+    for h in rows:
+        s = date.fromisoformat(h["date"])
+        e = date.fromisoformat(h["end_date"]) if h.get("end_date") else s
+        if e < first:
+            continue
+        d = max(s, first)
+        while d <= min(e, last):
+            out.setdefault(d.isoformat(), h["name"])
+            d += timedelta(days=1)
+    return out
+
+
+# ---------- monthly calendar for one student ----------
+@router.get("/calendar")
+async def student_calendar(student_id: str, month: str = Query(..., description="YYYY-MM"), ctx: TenantContext = Depends(get_ctx)):
+    first, last = _month_bounds(month)
+    student = await ctx.db.students.find_one({"id": student_id, **student_scope(ctx)}, {"_id": 0, "photo_base64": 0})
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    marks = {a["date"]: a["status"] async for a in ctx.db.attendance.find(
+        {"student_id": student_id, "date": {"$gte": first.isoformat(), "$lte": last.isoformat()}}, {"_id": 0})}
+    holidays = await _holiday_map(ctx, first, last)
+    today = datetime.now(timezone.utc).date()
+    days = []
+    counts = {"present": 0, "late": 0, "absent": 0, "holiday": 0, "unmarked": 0}
+    d = first
+    while d <= last:
+        iso = d.isoformat()
+        weekend = d.weekday() == 6          # Sunday off; Saturdays vary by school so they stay as school days
+        status = marks.get(iso)
+        entry = {"date": iso, "weekday": d.weekday(), "status": status, "holiday": holidays.get(iso), "weekend": weekend}
+        days.append(entry)
+        if status:
+            counts[status] += 1
+        elif holidays.get(iso):
+            counts["holiday"] += 1
+        elif not weekend and d <= today:
+            counts["unmarked"] += 1
+        d += timedelta(days=1)
+    marked = counts["present"] + counts["late"] + counts["absent"]
+    return {"student_id": student_id, "month": month, "days": days, "counts": counts,
+            "percent": round((counts["present"] + counts["late"]) / marked * 100) if marked else None,
+            "holidays": [{"date": k, "name": v} for k, v in sorted(holidays.items())]}
+
+
+# ---------- staff dashboard: every student's progress and fees ----------
+@router.get("/dashboard/overview")
+async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
+    classes = {c["id"]: c async for c in ctx.db.classes.find({}, {"_id": 0})}
+    students = await ctx.db.students.find({"status": "active"}, {"_id": 0, "photo_base64": 0}).to_list(3000)
+    if ctx.role == "teacher":
+        mine = {cid for cid, c in classes.items() if c.get("teacher_id") == ctx.user["id"]}
+        students = [s for s in students if s.get("class_id") in mine]
+    ids = {s["id"] for s in students}
+    since = (datetime.now(timezone.utc).date() - timedelta(days=30)).isoformat()
+
+    att: dict = {}
+    async for a in ctx.db.attendance.find({"date": {"$gte": since}}, {"_id": 0, "student_id": 1, "status": 1}):
+        if a["student_id"] in ids:
+            t = att.setdefault(a["student_id"], [0, 0])
+            t[1] += 1
+            t[0] += 1 if a["status"] in ("present", "late") else 0
+    fees: dict = {}
+    async for f in ctx.db.fees.find({}, {"_id": 0, "student_id": 1, "amount": 1, "paid_amount": 1}):
+        if f["student_id"] in ids:
+            t = fees.setdefault(f["student_id"], [0.0, 0.0])
+            t[0] += float(f.get("amount", 0))
+            t[1] += float(f.get("paid_amount", 0))
+
+    rows = []
+    for s in students:
+        g = [x for x in (s.get("grades") or []) if float(x.get("max_score") or 0) > 0]
+        avg = round(sum(float(x["score"]) / float(x["max_score"]) for x in g) / len(g) * 100) if g else None
+        a = att.get(s["id"])
+        total, paid = fees.get(s["id"], [0.0, 0.0])
+        c = classes.get(s.get("class_id"))
+        rows.append({
+            "id": s["id"], "name": f"{s['first_name']} {s.get('last_name', '')}".strip(),
+            "roll_number": s.get("roll_number"), "class_id": s.get("class_id"),
+            "class_name": f"{c['name']} {c.get('section') or ''}".strip() if c else None,
+            "grade_avg": avg, "grade_count": len(g),
+            "attendance_pct": round(a[0] / a[1] * 100) if a else None,
+            "fees_total": total, "fees_paid": paid, "fees_pending": max(total - paid, 0),
+            "fee_status": fee_status(total, paid) if total else "none",
+        })
+    by_class: dict = {}
+    for r in rows:
+        k = r["class_id"] or "none"
+        b = by_class.setdefault(k, {"class_id": r["class_id"], "class_name": r["class_name"] or "No class", "students": 0,
+                                    "_g": [], "_a": [], "fees_pending": 0.0, "fees_total": 0.0, "fees_paid": 0.0})
+        b["students"] += 1
+        if r["grade_avg"] is not None: b["_g"].append(r["grade_avg"])
+        if r["attendance_pct"] is not None: b["_a"].append(r["attendance_pct"])
+        b["fees_pending"] += r["fees_pending"]; b["fees_total"] += r["fees_total"]; b["fees_paid"] += r["fees_paid"]
+    summary = []
+    for b in by_class.values():
+        g, a = b.pop("_g"), b.pop("_a")
+        b["grade_avg"] = round(sum(g) / len(g)) if g else None
+        b["attendance_pct"] = round(sum(a) / len(a)) if a else None
+        summary.append(b)
+    summary.sort(key=lambda x: x["class_name"])
+    return {"students": rows, "classes": summary,
+            "totals": {"students": len(rows), "fees_total": sum(r["fees_total"] for r in rows),
+                       "fees_paid": sum(r["fees_paid"] for r in rows), "fees_pending": sum(r["fees_pending"] for r in rows),
+                       "defaulters": sum(1 for r in rows if r["fees_pending"] > 0),
+                       "low_attendance": sum(1 for r in rows if r["attendance_pct"] is not None and r["attendance_pct"] < 75)}}
