@@ -12,7 +12,7 @@ from ..security import TenantContext, require_roles
 from ..utils import new_id, now_iso
 
 router = APIRouter(prefix="/transport", tags=["transport"])
-STAFF = ("admin", "teacher")
+STAFF = ("admin",)   # whole-school transport lists are for the school admin only
 
 
 # ---------- buses ----------

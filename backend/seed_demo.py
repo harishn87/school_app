@@ -2,7 +2,8 @@
 
   - 12 classes: PP1, PP2, Class 1 ... Class 10, with 10 students each (120 students)
   - one parent login with two children (in Class 3 and Class 7)
-  - Term 1 fees (some paid, some part paid, some unpaid), grades, this month's attendance, holidays
+  - three teachers, each assigned to some classes (Ravi Kumar: Class 3 and Class 4)
+  - Term 1 fees (some paid, some part paid, some unpaid), Term 1 progress reports, this month's attendance, holidays
 
 Safe to run again: anything that already exists is skipped.
 Usage:  python seed_demo.py [--url http://localhost:8001] [--school demo]
@@ -28,6 +29,11 @@ ap.add_argument("--owner-password", default="OwnerPass#2026")
 A = ap.parse_args()
 
 PARENT_EMAIL, PARENT_PASSWORD = "parent@demo.example.com", "Parent#2026"
+TEACHER_EMAIL, TEACHER_PASSWORD = "teacher@demo.example.com", "Teacher#2026"
+# teacher email -> (name, classes). The first one is the demo teacher login.
+TEACHERS = {TEACHER_EMAIL: ("Ravi Kumar", ["Class 3", "Class 4"]),
+            "sunita.rao@demo.example.com": ("Sunita Rao", ["PP1", "PP2"]),
+            "anil.verma@demo.example.com": ("Anil Verma", ["Class 5", "Class 6"])}
 
 
 class Client:
@@ -125,7 +131,6 @@ def main():
                 "joining_date": "2026-06-10", "class_id": cid, "roll_number": str(roll),
                 "guardian_name": f"{'Mr' if rnd.random() < .5 else 'Mrs'} {last}", "guardian_phone": f"98{rnd.randint(10000000, 99999999)}",
                 "guardian_email": guardian, "address": "Hyderabad",
-                "grades": [{"subject": sub, "term": "Term 1", "score": rnd.randint(42, 98), "max_score": 100} for sub in subjects_for(idx)],
             }
             s = need(c.call("POST", "/students", body), f"add {first} {last}")
             amount = fee_for(idx)
@@ -135,6 +140,29 @@ def main():
             created += 1
         print(f"  {cname}: {max(0, 10 - len(mine))} added")
     print(f"Students added: {created}")
+
+    # Teachers, each assigned to some classes
+    users = {u["email"]: u for u in need(c.call("GET", "/users"), "list users")}
+    for email, (tname, cls_names) in TEACHERS.items():
+        u = users.get(email) or need(c.call("POST", "/users", {"name": tname, "email": email, "role": "teacher", "password": TEACHER_PASSWORD}), f"create teacher {tname}")
+        for cn in cls_names:
+            cl = classes[cn]
+            if cl.get("teacher_id") != u["id"]:
+                need(c.call("PUT", f"/classes/{cl['id']}", {"name": cl["name"], "section": cl.get("section") or "", "academic_year": cl.get("academic_year"), "teacher_id": u["id"]}), f"assign {cn}")
+    print(f"Teachers ready: {len(TEACHERS)}")
+
+    # Term 1 progress reports (these also fill each student's grades)
+    all_students = need(c.call("GET", "/students"), "list students")
+    remarks = ["Good progress. Keep it up.", "Works hard and participates well.", "Can do better with regular practice.", "Excellent effort this term.", None]
+    for idx, cname in enumerate(CLASSES):
+        cid = classes[cname]["id"]
+        if need(c.call("GET", f"/reports?class_id={cid}&term=Term%201"), "check reports"):
+            continue    # keep reports teachers have already saved
+        kids = [s for s in all_students if s.get("class_id") == cid]
+        entries = [{"student_id": s["id"], "remark": rnd.choice(remarks),
+                    "marks": [{"subject": sub, "score": rnd.randint(42, 98), "max_score": 100} for sub in subjects_for(idx)]} for s in kids]
+        need(c.call("POST", "/reports/batch", {"class_id": cid, "term": "Term 1", "entries": entries}), f"save reports for {cname}")
+    print("Term 1 progress reports saved for every class.")
 
     # Parent login (one parent, two children)
     code, data = c.call("POST", "/users", {"name": "Lakshmi Reddy", "email": PARENT_EMAIL, "role": "parent", "password": PARENT_PASSWORD})
@@ -164,8 +192,8 @@ def main():
             days += 1
         d += timedelta(days=1)
     print(f"Attendance marked for {days} school days this month.")
-    print("\nDone.\n  Admin : %s / %s  (school code %s)\n  Parent: %s / %s  (two children: Aarav Reddy, Class 3 and Ananya Reddy, Class 7)"
-          % (A.admin, A.password, A.school, PARENT_EMAIL, PARENT_PASSWORD))
+    print("\nDone.\n  Admin  : %s / %s  (school code %s)\n  Teacher: %s / %s  (Class 3 and Class 4)\n  Parent : %s / %s  (two children: Aarav Reddy, Class 3 and Ananya Reddy, Class 7)"
+          % (A.admin, A.password, A.school, TEACHER_EMAIL, TEACHER_PASSWORD, PARENT_EMAIL, PARENT_PASSWORD))
 
 
 main()

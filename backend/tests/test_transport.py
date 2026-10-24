@@ -23,8 +23,8 @@ def _setup(server, new_client):
 
 def test_roles(server, new_client):
     x = _setup(server, new_client)
-    assert x["teacher"].get("/api/transport/routes").status_code == 200
-    assert x["teacher"].get("/api/transport/buses").status_code == 200
+    assert x["teacher"].get("/api/transport/routes").status_code == 403
+    assert x["teacher"].get("/api/transport/buses").status_code == 403
     assert x["teacher"].post("/api/transport/buses", json={"number": "Bus 9"}).status_code == 403
     assert x["mom"].get("/api/transport/routes").status_code == 403
     assert x["mom"].put(f"/api/transport/assignments/{x['kid']['id']}", json={"route_id": x["route"]["id"], "stop": "Miyapur"}).status_code == 403

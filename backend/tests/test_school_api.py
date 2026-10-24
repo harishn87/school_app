@@ -106,7 +106,7 @@ def test_admin_manages_users_and_roles_are_enforced(server, new_client):
     _make_user(admin, "teacher", "t@greenwood.example.com")
     teacher = new_client(); assert login(teacher, "greenwood", "t@greenwood.example.com").status_code == 200
 
-    assert teacher.post("/api/students", json=STUDENT).status_code == 201
+    assert teacher.post("/api/students", json=STUDENT).status_code == 403   # teachers add students only to their own class
     assert teacher.post("/api/classes", json={"name": "X"}).status_code == 403
     assert teacher.post("/api/users", json={"name": "n", "email": "n@x.example.com", "role": "admin",
                                             "password": PASSWORD}).status_code == 403

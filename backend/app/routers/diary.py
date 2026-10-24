@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..models import PostBatchIn, PostIn
 from ..security import TenantContext, get_ctx, require_roles
 from ..utils import new_id, now_iso
-from .school import fee_status, student_scope
+from .school import fee_status, student_scope, teacher_class_ids
 from .transport import transport_for_student
 
 router = APIRouter(tags=["diary"])
@@ -72,6 +72,14 @@ async def list_posts(class_id: Optional[str] = None, kind: Optional[str] = Query
             query["class_id"] = class_id
         else:
             query["class_id"] = {"$in": allowed}
+    elif ctx.role == "teacher":
+        mine = await teacher_class_ids(ctx)
+        if class_id:
+            if class_id not in mine:
+                return []
+            query["class_id"] = class_id
+        else:
+            query["class_id"] = {"$in": mine}
     elif class_id:
         query["class_id"] = class_id
     if kind:

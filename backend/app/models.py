@@ -229,3 +229,22 @@ class HolidayIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     end_date: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")   # for multi-day breaks
+
+
+# --- Progress reports ---
+class MarkIn(BaseModel):
+    subject: str = Field(min_length=1, max_length=100)
+    score: Optional[float] = Field(default=None, ge=0)
+    max_score: float = Field(default=100, gt=0, le=1000)
+
+
+class ReportEntryIn(BaseModel):
+    student_id: str
+    marks: List[MarkIn] = Field(default=[], max_length=20)
+    remark: Optional[str] = Field(default=None, max_length=500)
+
+
+class ReportBatchIn(BaseModel):
+    class_id: str
+    term: str = Field(min_length=1, max_length=100)
+    entries: List[ReportEntryIn] = Field(max_length=300)

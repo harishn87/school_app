@@ -44,6 +44,7 @@ export default function DashboardHome() {
   }, []);
 
   const parent = user?.role === "parent";
+  const teacher = user?.role === "teacher";
   const collected = stats.fees_collected || 0;
   const pending = stats.fees_pending || 0;
   const total = collected + pending;
@@ -66,7 +67,18 @@ export default function DashboardHome() {
       </header>
 
       <div className="grid lg:grid-cols-3 gap-6" data-testid="stats-grid">
-        {/* Fees: the one hero card */}
+        {teacher ? (
+          <section className="lg:col-span-2 rounded-3xl p-7 text-white relative overflow-hidden surface-midnight" data-testid="teacher-hero" style={{ boxShadow: "0 24px 50px -24px rgba(35,64,240,.7)" }}>
+            <div className="text-sm text-slate-300">Your students</div>
+            <div className="font-heading text-4xl sm:text-5xl font-semibold mt-2">{n(stats.total_students)}</div>
+            <p className="text-sm text-slate-300 mt-2">across {n(stats.total_classes)} {stats.total_classes === 1 ? "class" : "classes"}</p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Link to="/app/progress" className="inline-flex items-center gap-1 text-sm rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5">Update progress reports <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+              <Link to="/app/attendance" className="inline-flex items-center gap-1 text-sm rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5">Mark attendance <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+            </div>
+          </section>
+        ) : (
+        /* Fees: the one hero card */
         <section className="lg:col-span-2 rounded-3xl p-7 text-white relative overflow-hidden surface-midnight"
           style={{ boxShadow: "0 24px 50px -24px rgba(35,64,240,.7)" }}>
           <div className="flex items-start justify-between">
@@ -90,6 +102,7 @@ export default function DashboardHome() {
             </div>
           </div>
         </section>
+        )}
 
         <section className="ui-card p-6 flex items-center gap-5">
           <div className="relative shrink-0">
@@ -111,10 +124,10 @@ export default function DashboardHome() {
           </div>
         </section>
 
-        <Small icon={GraduationCap} label="Active students" value={n(stats.total_students)} testid="stat-total_students" />
-        {!parent && <Small icon={Users} label="Classes" value={n(stats.total_classes)} testid="stat-total_classes" />}
+        {!teacher && <Small icon={GraduationCap} label="Active students" value={n(stats.total_students)} testid="stat-total_students" />}
+        {!parent && !teacher && <Small icon={Users} label="Classes" value={n(stats.total_classes)} testid="stat-total_classes" />}
         {parent && <Small icon={Clock} label="Fees pending" value={stats.fees_pending == null ? "—" : formatMoney(pending)} testid="stat-parent_pending" tone="amber" />}
-        {!parent && <Small icon={UserMinus} label="Students who left" value={n(stats.students_left)} testid="stat-students_left" tone="slate" />}
+        {!parent && !teacher && <Small icon={UserMinus} label="Students who left" value={n(stats.students_left)} testid="stat-students_left" tone="slate" />}
       </div>
 
       {!parent && <ProgressBoard />}

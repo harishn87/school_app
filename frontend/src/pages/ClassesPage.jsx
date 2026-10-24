@@ -123,7 +123,7 @@ export default function ClassesPage() {
                   {cell("Students", st.students)}
                   {cell("Attend.", st.attendance_pct == null ? "-" : `${st.attendance_pct}%`)}
                   {cell("Grade", st.grade_avg == null ? "-" : `${st.grade_avg}%`)}
-                  {cell("Fees due", st.fees_pending > 0 ? formatMoney(st.fees_pending) : "Nil")}
+                  {isAdmin && cell("Fees due", st.fees_pending > 0 ? formatMoney(st.fees_pending) : "Nil")}
                 </dl>
               );
             })()}

@@ -48,7 +48,9 @@ def test_parent_sees_only_their_childs_class(server, new_client):
     assert mine == ["Grade 5 lesson"]
     assert x["mom"].get("/api/posts", params={"class_id": x["c6"]["id"]}).json() == []
     assert [p["title"] for p in x["other"].get("/api/posts").json()] == ["Grade 6 trip"]
-    assert len(x["t2"].get("/api/posts").json()) == 2   # staff see all
+    assert len(x["admin"].get("/api/posts").json()) == 2   # admin sees all
+    assert x["t2"].get("/api/posts").json() == []          # a teacher with no classes sees none
+    assert [p["title"] for p in x["t1"].get("/api/posts").json()] == ["Grade 5 lesson"]
 
 
 def test_delete_rules(server, new_client):

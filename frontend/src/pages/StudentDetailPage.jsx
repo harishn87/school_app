@@ -5,6 +5,7 @@ import { ArrowLeft, Pencil, Trash2, GraduationCap, Phone, Mail, MapPin, Calendar
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import StudentFormModal from "@/components/StudentFormModal";
+import ReportCard from "@/components/ReportCard";
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -16,6 +17,7 @@ export default function StudentDetailPage() {
   const [student, setStudent] = useState(null);
   const [classes, setClasses] = useState([]);
   const [showEdit, setShowEdit] = useState(false);
+  const [reports, setReports] = useState([]);
 
   const load = useCallback(async () => {
     try {
@@ -28,6 +30,7 @@ export default function StudentDetailPage() {
     } catch (e) { toast.error("Could not load student"); }
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { api.get("/reports", { params: { student_id: id } }).then((r) => setReports(r.data)).catch(() => {}); }, [id]);
 
   const onDelete = async () => {
     if (!confirm("Delete this student?")) return;
@@ -94,11 +97,19 @@ export default function StudentDetailPage() {
         </div>
       </div>
 
-      <div className="ui-card p-6">
-        <h2 className="font-heading text-2xl font-semibold">Academic records</h2>
-        {(!student.grades || student.grades.length === 0) ? (
-          <p className="text-sm text-slate-500 mt-2">No grades recorded yet. Add some by editing the student.</p>
-        ) : (
+      <div className="ui-card p-6" data-testid="academics">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-heading text-2xl font-semibold">Academics</h2>
+          {canEdit && student.class_id && <Link to={`/app/progress?class=${student.class_id}`} className="ui-btn text-sm" data-testid="update-progress-link">Update progress report</Link>}
+        </div>
+        {reports.length > 0 && (
+          <div className="mt-4 grid lg:grid-cols-2 gap-4" data-testid="academics-reports">
+            {reports.map((r) => <ReportCard key={r.id} report={r} compact />)}
+          </div>
+        )}
+        {reports.length === 0 && (!student.grades || student.grades.length === 0) ? (
+          <p className="text-sm text-slate-500 mt-2">No progress report yet. {canEdit ? "Use \"Update progress report\" to add one." : ""}</p>
+        ) : reports.length > 0 ? null : (
           <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {student.grades.map((g, i) => (
               <div key={i} className="ui-card !shadow-sm p-4">

@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..models import HolidayIn
 from ..security import TenantContext, get_ctx, require_roles
 from ..utils import new_id, now_iso
-from .school import fee_status, student_scope
+from .school import fee_status, scope_for
 
 router = APIRouter(tags=["insights"])
 
@@ -80,7 +80,7 @@ async def _holiday_map(ctx: TenantContext, first: date, last: date) -> dict:
 @router.get("/calendar")
 async def student_calendar(student_id: str, month: str = Query(..., description="YYYY-MM"), ctx: TenantContext = Depends(get_ctx)):
     first, last = _month_bounds(month)
-    student = await ctx.db.students.find_one({"id": student_id, **student_scope(ctx)}, {"_id": 0, "photo_base64": 0})
+    student = await ctx.db.students.find_one({"id": student_id, **await scope_for(ctx)}, {"_id": 0, "photo_base64": 0})
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
     marks = {a["date"]: a["status"] async for a in ctx.db.attendance.find(
@@ -112,11 +112,9 @@ async def student_calendar(student_id: str, month: str = Query(..., description=
 # ---------- staff dashboard: every student's progress and fees ----------
 @router.get("/dashboard/overview")
 async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
-    classes = {c["id"]: c async for c in ctx.db.classes.find({}, {"_id": 0})}
-    students = await ctx.db.students.find({"status": "active"}, {"_id": 0, "photo_base64": 0}).to_list(3000)
-    if ctx.role == "teacher":
-        mine = {cid for cid, c in classes.items() if c.get("teacher_id") == ctx.user["id"]}
-        students = [s for s in students if s.get("class_id") in mine]
+    teacher = ctx.role == "teacher"
+    classes = {c["id"]: c async for c in ctx.db.classes.find({"teacher_id": ctx.user["id"]} if teacher else {}, {"_id": 0})}
+    students = await ctx.db.students.find({"status": "active", **await scope_for(ctx)}, {"_id": 0, "photo_base64": 0}).to_list(3000)
     ids = {s["id"] for s in students}
     since = (datetime.now(timezone.utc).date() - timedelta(days=30)).isoformat()
 
@@ -165,11 +163,21 @@ async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin",
         b["attendance_pct"] = round(sum(a) / len(a)) if a else None
         summary.append(b)
     summary.sort(key=lambda x: x["class_name"])
-    return {"students": rows, "classes": summary,
-            "totals": {"students": len(rows), "fees_total": sum(r["fees_total"] for r in rows),
-                       "fees_paid": sum(r["fees_paid"] for r in rows), "fees_pending": sum(r["fees_pending"] for r in rows),
-                       "defaulters": sum(1 for r in rows if r["fees_pending"] > 0),
-                       "low_attendance": sum(1 for r in rows if r["attendance_pct"] is not None and r["attendance_pct"] < 75)}}
+    totals = {"students": len(rows), "fees_total": sum(r["fees_total"] for r in rows),
+              "fees_paid": sum(r["fees_paid"] for r in rows), "fees_pending": sum(r["fees_pending"] for r in rows),
+              "defaulters": sum(1 for r in rows if r["fees_pending"] > 0),
+              "low_attendance": sum(1 for r in rows if r["attendance_pct"] is not None and r["attendance_pct"] < 75)}
+    if teacher:     # teachers never see fee information
+        fee_keys = ("fees_total", "fees_paid", "fees_pending", "fee_status")
+        for r in rows:
+            for k in fee_keys:
+                r[k] = None
+        for b in summary:
+            for k in ("fees_total", "fees_paid", "fees_pending"):
+                b[k] = None
+        for k in ("fees_total", "fees_paid", "fees_pending", "defaulters"):
+            totals[k] = None
+    return {"students": rows, "classes": summary, "totals": totals}
 
 
 # ---------- monthly attendance overview for staff (whole school or one class) ----------
@@ -177,9 +185,7 @@ async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin",
 async def attendance_month(month: str = Query(..., description="YYYY-MM"), class_id: Optional[str] = None,
                            ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
     first, last = _month_bounds(month)
-    sq: dict = {"status": "active"}
-    if class_id:
-        sq["class_id"] = class_id
+    sq: dict = {"status": "active", **await scope_for(ctx, class_id)}
     ids = [s["id"] async for s in ctx.db.students.find(sq, {"_id": 0, "id": 1})]
     per: dict = {}
     async for a in ctx.db.attendance.find({"student_id": {"$in": ids}, "date": {"$gte": first.isoformat(), "$lte": last.isoformat()}},

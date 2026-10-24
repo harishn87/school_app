@@ -28,12 +28,40 @@ def student_scope(ctx: TenantContext) -> dict:
     return {}
 
 
+async def teacher_class_ids(ctx: TenantContext) -> List[str]:
+    """Classes assigned to this teacher (empty for other roles)."""
+    if ctx.role != "teacher":
+        return []
+    return [c["id"] async for c in ctx.db.classes.find({"teacher_id": ctx.user["id"]}, {"_id": 0, "id": 1})]
+
+
+async def scope_for(ctx: TenantContext, class_id: Optional[str] = None) -> dict:
+    """Student query limited to what this user may see: all (admin), own classes (teacher), own children (parent)."""
+    if ctx.role == "parent":
+        q = student_scope(ctx)
+        if class_id:
+            q["class_id"] = class_id
+        return q
+    if ctx.role == "teacher":
+        mine = await teacher_class_ids(ctx)
+        if class_id:
+            mine = [class_id] if class_id in mine else []
+        return {"class_id": {"$in": mine}}
+    return {"class_id": class_id} if class_id else {}
+
+
 async def visible_student_ids(ctx: TenantContext) -> Optional[List[str]]:
-    """None means 'all students' (staff); a list restricts to a parent's children."""
-    if ctx.role != "parent":
+    """None means 'all students' (admin); a list restricts a parent to their children or a teacher to their classes."""
+    if ctx.role == "admin":
         return None
-    rows = await ctx.db.students.find(student_scope(ctx), {"_id": 0, "id": 1}).to_list(500)
+    rows = await ctx.db.students.find(await scope_for(ctx), {"_id": 0, "id": 1}).to_list(5000)
     return [r["id"] for r in rows]
+
+
+async def require_own_class(ctx: TenantContext, class_id: Optional[str]) -> None:
+    """Teachers may only work with students of their own classes."""
+    if ctx.role == "teacher" and class_id not in await teacher_class_ids(ctx):
+        raise HTTPException(status_code=403, detail="You can only manage students in classes assigned to you.")
 
 
 def fee_status(amount: float, paid: float) -> str:
@@ -114,7 +142,8 @@ async def delete_user(user_id: str, ctx: TenantContext = Depends(require_roles("
 # ---------- classes ----------
 @router.get("/classes")
 async def list_classes(ctx: TenantContext = Depends(get_ctx)):
-    return await ctx.db.classes.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    query = {"teacher_id": ctx.user["id"]} if ctx.role == "teacher" else {}
+    return await ctx.db.classes.find(query, {"_id": 0}).sort("name", 1).to_list(1000)
 
 
 @router.post("/classes", status_code=201)
@@ -148,9 +177,7 @@ async def delete_class(class_id: str, ctx: TenantContext = Depends(require_roles
 @router.get("/students")
 async def list_students(q: Optional[str] = Query(None, max_length=100), class_id: Optional[str] = None,
                         status: Optional[str] = None, ctx: TenantContext = Depends(get_ctx)):
-    query = student_scope(ctx)
-    if class_id:
-        query["class_id"] = class_id
+    query = await scope_for(ctx, class_id)
     if status:
         query["status"] = status
     if q and q.strip():
@@ -163,6 +190,7 @@ async def list_students(q: Optional[str] = Query(None, max_length=100), class_id
 @router.post("/students", status_code=201)
 async def create_student(payload: StudentIn, ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
     await _check_class(ctx, payload.class_id)
+    await require_own_class(ctx, payload.class_id)
     if payload.status == "active":
         active = await ctx.db.students.count_documents({"status": "active"})
         if active >= limits_for(ctx.school)["max_students"]:
@@ -175,7 +203,7 @@ async def create_student(payload: StudentIn, ctx: TenantContext = Depends(requir
 
 @router.get("/students/{student_id}")
 async def get_student(student_id: str, ctx: TenantContext = Depends(get_ctx)):
-    doc = await ctx.db.students.find_one({"id": student_id, **student_scope(ctx)}, {"_id": 0})
+    doc = await ctx.db.students.find_one({"id": student_id, **await scope_for(ctx)}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Student not found")
     return doc
@@ -184,9 +212,10 @@ async def get_student(student_id: str, ctx: TenantContext = Depends(get_ctx)):
 @router.put("/students/{student_id}")
 async def update_student(student_id: str, payload: StudentIn, ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
     await _check_class(ctx, payload.class_id)
-    current = await ctx.db.students.find_one({"id": student_id}, {"_id": 0, "status": 1})
+    current = await ctx.db.students.find_one({"id": student_id, **await scope_for(ctx)}, {"_id": 0, "status": 1})
     if not current:
         raise HTTPException(status_code=404, detail="Student not found")
+    await require_own_class(ctx, payload.class_id)
     if payload.status == "active" and current.get("status") != "active":
         active = await ctx.db.students.count_documents({"status": "active"})
         if active >= limits_for(ctx.school)["max_students"]:
@@ -209,7 +238,7 @@ async def delete_student(student_id: str, ctx: TenantContext = Depends(require_r
 
 # ---------- fees ----------
 @router.get("/fees")
-async def list_fees(student_id: Optional[str] = None, ctx: TenantContext = Depends(get_ctx)):
+async def list_fees(student_id: Optional[str] = None, ctx: TenantContext = Depends(require_roles("admin", "parent"))):
     query: dict = {}
     ids = await visible_student_ids(ctx)
     if ids is not None:
@@ -260,9 +289,10 @@ async def mark_attendance(payload: AttendanceBatchIn, ctx: TenantContext = Depen
     if not payload.marks:
         return {"updated": 0}
     ids = list({m.student_id for m in payload.marks})
-    found = await ctx.db.students.count_documents({"id": {"$in": ids}})
+    found = await ctx.db.students.count_documents({"id": {"$in": ids}, **await scope_for(ctx)})
     if found != len(ids):
-        raise HTTPException(status_code=400, detail="One or more students were not found")
+        raise HTTPException(status_code=400, detail="One or more students were not found" if ctx.role == "admin"
+                            else "One or more students are not in your classes")
     for m in payload.marks:
         await ctx.db.attendance.update_one(
             {"student_id": m.student_id, "date": payload.date},
@@ -295,13 +325,13 @@ async def list_attendance(date_str: Optional[str] = Query(None, alias="date"), c
 # ---------- dashboard ----------
 @router.get("/dashboard/stats")
 async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
-    scope = student_scope(ctx)
+    scope = await scope_for(ctx)
     ids = await visible_student_ids(ctx)
     fee_q = {} if ids is None else {"student_id": {"$in": ids}}
 
     total_students = await ctx.db.students.count_documents({**scope, "status": "active"})
     total_left = await ctx.db.students.count_documents({**scope, "status": "left"})
-    total_classes = await ctx.db.classes.count_documents({})
+    total_classes = await ctx.db.classes.count_documents({"teacher_id": ctx.user["id"]} if ctx.role == "teacher" else {})
 
     total_due = total_collected = 0.0
     async for f in ctx.db.fees.find(fee_q, {"_id": 0, "amount": 1, "paid_amount": 1}):
@@ -314,9 +344,13 @@ async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
     present = await ctx.db.attendance.count_documents({**att_q, "status": {"$in": ["present", "late"]}})
     pct = round(present / total_marked * 100) if total_marked else 0
 
-    return {
+    out = {
         "total_students": total_students, "students_left": total_left, "total_classes": total_classes,
         "fees_total_due": total_due, "fees_collected": total_collected,
         "fees_pending": max(total_due - total_collected, 0),
         "attendance_today_pct": pct, "attendance_today_marked": total_marked,
     }
+    if ctx.role == "teacher":       # teachers never see fee information
+        for k in ("fees_total_due", "fees_collected", "fees_pending"):
+            out[k] = None
+    return out

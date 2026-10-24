@@ -9,7 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .db import ensure_platform_indexes, ensure_tenant_indexes, get_client, platform_db, tenant_db
-from .routers import auth, billing, certificates, diary, insights, platform, school, signup, transport
+from .routers import auth, billing, certificates, diary, insights, platform, reports, school, signup, transport
 from .security import hash_password, verify_password
 from .tenants import create_school
 from .utils import new_id, now_iso
@@ -134,7 +134,7 @@ def create_app() -> FastAPI:
     async def root():
         return {"message": "Scholaris API"}
 
-    for r in (auth.router, signup.router, school.router, diary.router, insights.router, certificates.router, transport.router, billing.router, platform.router):
+    for r in (auth.router, signup.router, school.router, diary.router, insights.router, reports.router, certificates.router, transport.router, billing.router, platform.router):
         api.include_router(r)
     app.include_router(api)
     _mount_frontend(app)

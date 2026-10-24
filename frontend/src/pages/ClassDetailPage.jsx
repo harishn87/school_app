@@ -56,7 +56,8 @@ export default function ClassDetailPage() {
   const late = dayMarks.filter((m) => m.status === "late" && byId[m.student_id]);
   const present = dayMarks.filter((m) => m.status === "present" && byId[m.student_id]).length;
   const marked = absent.length + late.length + present;
-  const pending = rows.reduce((a, r) => a + r.fees_pending, 0);
+  const showFees = !!ov && ov.totals.fees_pending != null;
+  const pending = rows.reduce((a, r) => a + (r.fees_pending || 0), 0);
 
   if (missing) return <div className="ui-card p-8 text-center text-slate-500">Class not found. <Link className="text-[#2B4BFF]" to="/app/classes">Back to classes</Link></div>;
   if (!cls || !ov) return <div className="max-w-6xl mx-auto h-40 ui-card animate-pulse" />;
@@ -69,11 +70,11 @@ export default function ClassDetailPage() {
         <p className="text-slate-500 mt-1">{teacher ? `Class teacher: ${teacher.name}` : "No class teacher assigned"}{cls.academic_year ? ` · ${cls.academic_year}` : ""}</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 gap-4 ${showFees ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <Tile icon={GraduationCap} label="Students" value={rows.length} testid="cd-students" />
         <Tile icon={CalendarCheck} label="Attendance, 30 days" value={sum?.attendance_pct == null ? "-" : `${sum.attendance_pct}%`} testid="cd-att" />
         <Tile icon={TrendingUp} label="Average grade" value={sum?.grade_avg == null ? "-" : `${sum.grade_avg}%`} testid="cd-grade" />
-        <Tile icon={Wallet} label="Fees pending" value={pending > 0 ? formatMoney(pending) : "Nil"} sub={`${rows.filter((r) => r.fees_pending > 0).length} students`} testid="cd-fees" />
+        {showFees && <Tile icon={Wallet} label="Fees pending" value={pending > 0 ? formatMoney(pending) : "Nil"} sub={`${rows.filter((r) => r.fees_pending > 0).length} students`} testid="cd-fees" />}
       </div>
 
       <section className="ui-card overflow-hidden">
@@ -85,19 +86,19 @@ export default function ClassDetailPage() {
           <table className="w-full text-sm" data-testid="cd-table">
             <thead><tr>
               <th scope="col" className="table-head px-4 py-2.5 text-left">Roll</th><th scope="col" className="table-head px-4 py-2.5 text-left">Student</th>
-              <th scope="col" className="table-head px-4 py-2.5 text-right">Grade avg</th><th scope="col" className="table-head px-4 py-2.5 text-right">Attendance</th><th scope="col" className="table-head px-4 py-2.5 text-right">Fees</th>
+              <th scope="col" className="table-head px-4 py-2.5 text-right">Grade avg</th><th scope="col" className="table-head px-4 py-2.5 text-right">Attendance</th>{showFees && <th scope="col" className="table-head px-4 py-2.5 text-right">Fees</th>}
             </tr></thead>
             <tbody className="divide-y divide-[#EEF0F6]">
-              {rows.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-slate-500">No students in this class yet.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={showFees ? 5 : 4} className="px-4 py-8 text-center text-slate-500">No students in this class yet.</td></tr>}
               {rows.map((s) => {
-                const [fl, fc] = FEE[s.fee_status];
+                const [fl, fc] = FEE[s.fee_status || "none"];
                 return (
                   <tr key={s.id} className="hover:bg-[#F7F8FF]" data-testid={`cd-row-${s.id}`}>
                     <td className="px-4 py-2.5 text-slate-500 tabular-nums">{s.roll_number || "-"}</td>
                     <td className="px-4 py-2.5"><Link className="font-medium hover:text-[#2B4BFF]" to={`/app/students/${s.id}`}>{s.name}</Link></td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.grade_avg == null ? "-" : `${s.grade_avg}%`}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.attendance_pct == null ? "-" : `${s.attendance_pct}%`}{s.attendance_pct != null && s.attendance_pct < 75 ? " ⚠" : ""}</td>
-                    <td className="px-4 py-2.5 text-right"><span className={`pill ${fc}`}>{fl}</span>{s.fees_pending > 0 && <span className="ml-2 tabular-nums text-slate-600">{formatMoney(s.fees_pending)}</span>}</td>
+                    {showFees && <td className="px-4 py-2.5 text-right"><span className={`pill ${fc}`}>{fl}</span>{s.fees_pending > 0 && <span className="ml-2 tabular-nums text-slate-600">{formatMoney(s.fees_pending)}</span>}</td>}
                   </tr>
                 );
               })}

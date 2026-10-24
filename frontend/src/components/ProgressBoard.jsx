@@ -26,7 +26,7 @@ const SORTS = {
   name: (a, b) => a.name.localeCompare(b.name),
   grade: (a, b) => (a.grade_avg ?? -1) - (b.grade_avg ?? -1),
   attendance: (a, b) => (a.attendance_pct ?? -1) - (b.attendance_pct ?? -1),
-  pending: (a, b) => a.fees_pending - b.fees_pending,
+  pending: (a, b) => (a.fees_pending || 0) - (b.fees_pending || 0),
 };
 
 /** Staff dashboard: every student's grades, attendance and fees in one place. */
@@ -39,12 +39,14 @@ export default function ProgressBoard() {
 
   useEffect(() => { api.get("/dashboard/overview").then((r) => setData(r.data)).catch(() => setData({ students: [], classes: [], totals: {} })); }, []);
 
+  const showFees = !data || data.totals.fees_pending != null;
   const rows = useMemo(() => {
     if (!data) return [];
     let r = data.students.filter((s) => (!cls || s.class_id === cls) && s.name.toLowerCase().includes(q.trim().toLowerCase()));
     if (only === "fees") r = r.filter((s) => s.fees_pending > 0);
     if (only === "attendance") r = r.filter((s) => s.attendance_pct != null && s.attendance_pct < 75);
-    return [...r].sort((a, b) => SORTS[sort.key](a, b) * sort.dir);
+    const key = data.totals.fees_pending == null && sort.key === "pending" ? "name" : sort.key;
+    return [...r].sort((a, b) => SORTS[key](a, b) * (key === sort.key ? sort.dir : 1));
   }, [data, q, cls, sort, only]);
 
   if (!data || data.students.length === 0) return null;
@@ -61,12 +63,12 @@ export default function ProgressBoard() {
     <section className="space-y-4" data-testid="progress-board">
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="font-heading text-xl font-semibold">Student progress and fees</h2>
-          <p className="text-sm text-slate-500">Grades from academic records, attendance for the last 30 days, and fees.</p>
+          <h2 className="font-heading text-xl font-semibold">{showFees ? "Student progress and fees" : "Student progress"}</h2>
+          <p className="text-sm text-slate-500">Grades from progress reports, attendance for the last 30 days{showFees ? ", and fees" : ""}.</p>
         </div>
         <div className="flex gap-2 text-sm">
-          <button type="button" onClick={() => setOnly(only === "fees" ? "" : "fees")} aria-pressed={only === "fees"} data-testid="filter-fees"
-            className={`pill ${only === "fees" ? "bg-[#2B4BFF] text-white" : "bg-amber-50 text-amber-700"}`}>{t.defaulters} with fees pending</button>
+          {showFees && <button type="button" onClick={() => setOnly(only === "fees" ? "" : "fees")} aria-pressed={only === "fees"} data-testid="filter-fees"
+            className={`pill ${only === "fees" ? "bg-[#2B4BFF] text-white" : "bg-amber-50 text-amber-700"}`}>{t.defaulters} with fees pending</button>}
           <button type="button" onClick={() => setOnly(only === "attendance" ? "" : "attendance")} aria-pressed={only === "attendance"} data-testid="filter-attendance"
             className={`pill ${only === "attendance" ? "bg-[#2B4BFF] text-white" : "bg-rose-50 text-rose-700"}`}>{t.low_attendance} below 75% attendance</button>
         </div>
@@ -74,7 +76,7 @@ export default function ProgressBoard() {
 
       <div className="ui-card overflow-x-auto" data-testid="class-summary">
         <table className="w-full text-sm">
-          <thead><tr><th scope="col" className="table-head px-4 py-2.5 text-left">Class</th><th scope="col" className="table-head px-4 py-2.5 text-right">Students</th><th scope="col" className="table-head px-4 py-2.5 text-left">Average grade</th><th scope="col" className="table-head px-4 py-2.5 text-left">Attendance</th><th scope="col" className="table-head px-4 py-2.5 text-right">Fees pending</th></tr></thead>
+          <thead><tr><th scope="col" className="table-head px-4 py-2.5 text-left">Class</th><th scope="col" className="table-head px-4 py-2.5 text-right">Students</th><th scope="col" className="table-head px-4 py-2.5 text-left">Average grade</th><th scope="col" className="table-head px-4 py-2.5 text-left">Attendance</th>{showFees && <th scope="col" className="table-head px-4 py-2.5 text-right">Fees pending</th>}</tr></thead>
           <tbody className="divide-y divide-[#EEF0F6]">
             {data.classes.map((c) => (
               <tr key={c.class_id || "none"}>
@@ -82,7 +84,7 @@ export default function ProgressBoard() {
                 <td className="px-4 py-3 text-right tabular-nums">{c.students}</td>
                 <td className="px-4 py-3"><Bar value={c.grade_avg} /></td>
                 <td className="px-4 py-3"><Bar value={c.attendance_pct} low={c.attendance_pct != null && c.attendance_pct < 75} /></td>
-                <td className="px-4 py-3 text-right tabular-nums">{c.fees_pending > 0 ? formatMoney(c.fees_pending) : "Nil"}</td>
+                {showFees && <td className="px-4 py-3 text-right tabular-nums">{c.fees_pending > 0 ? formatMoney(c.fees_pending) : "Nil"}</td>}
               </tr>
             ))}
           </tbody>
@@ -102,10 +104,10 @@ export default function ProgressBoard() {
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="board-table">
-            <thead><tr>{head("name", "Student")}{head("grade", "Grade avg")}{head("attendance", "Attendance")}{head("pending", "Fees", true)}</tr></thead>
+            <thead><tr>{head("name", "Student")}{head("grade", "Grade avg")}{head("attendance", "Attendance")}{showFees && head("pending", "Fees", true)}</tr></thead>
             <tbody className="divide-y divide-[#EEF0F6]">
               {rows.map((s) => {
-                const [fl, fc] = FEE[s.fee_status];
+                const [fl, fc] = FEE[s.fee_status || "none"];
                 return (
                   <tr key={s.id} data-testid={`board-row-${s.id}`} className="hover:bg-[#F7F8FF]">
                     <td className="px-4 py-3">
@@ -114,14 +116,14 @@ export default function ProgressBoard() {
                     </td>
                     <td className="px-4 py-3"><Bar value={s.grade_avg} /></td>
                     <td className="px-4 py-3"><Bar value={s.attendance_pct} low={s.attendance_pct != null && s.attendance_pct < 75} /></td>
-                    <td className="px-4 py-3 text-right">
+                    {showFees && <td className="px-4 py-3 text-right">
                       <div className="tabular-nums font-medium">{s.fees_pending > 0 ? formatMoney(s.fees_pending) : s.fees_total ? "Nil" : "-"}</div>
                       <span className={`pill ${fc} mt-0.5`}>{fl}</span>
-                    </td>
+                    </td>}
                   </tr>
                 );
               })}
-              {rows.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-slate-500">No students match.</td></tr>}
+              {rows.length === 0 && <tr><td colSpan={showFees ? 4 : 3} className="px-4 py-8 text-center text-slate-500">No students match.</td></tr>}
             </tbody>
           </table>
         </div>

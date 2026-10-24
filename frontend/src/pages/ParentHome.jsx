@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { fmtTime, formatDate, formatMoney } from "@/lib/utils";
 import PostCard from "@/components/PostCard";
 import MonthCalendar from "@/components/MonthCalendar";
+import ReportCard from "@/components/ReportCard";
 
 const STATUS = {
   present: ["Present today", "bg-emerald-50 text-emerald-700"],
@@ -13,7 +14,7 @@ const STATUS = {
   absent: ["Absent today", "bg-rose-50 text-rose-700"],
 };
 
-function Child({ c }) {
+function Child({ c, report }) {
   const [txt, tone] = STATUS[c.attendance.today] || ["Not marked yet", "bg-slate-100 text-slate-600"];
   const pct = c.attendance.percent;
   const nd = c.fees.next_due;
@@ -46,6 +47,16 @@ function Child({ c }) {
         </Link>
       </div>
 
+      {report && (
+        <div className="mt-3" data-testid={`latest-report-${c.id}`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-slate-600">Latest progress report</span>
+            <Link to="/app/progress" className="text-sm font-medium text-[#2B4BFF] hover:underline">All reports</Link>
+          </div>
+          <ReportCard report={report} compact />
+        </div>
+      )}
+
       <MonthCalendar studentId={c.id} />
 
       {c.transport && (
@@ -76,9 +87,11 @@ export default function ParentHome() {
   const { user } = useAuth();
   const [data, setData] = useState(null);
   const [classes, setClasses] = useState({});
+  const [reports, setReports] = useState([]);
 
   useEffect(() => {
     api.get("/parent/overview").then((r) => setData(r.data)).catch(() => setData({ children: [], posts: [] }));
+    api.get("/reports").then((r) => setReports(r.data)).catch(() => {});
     api.get("/classes").then((r) => setClasses(Object.fromEntries(r.data.map((c) => [c.id, `${c.name} ${c.section || ""}`.trim()])))).catch(() => {});
   }, []);
 
@@ -94,7 +107,7 @@ export default function ParentHome() {
           No students are linked to <b>{user?.email}</b> yet. Ask the school to add your email as the guardian email on your child&apos;s profile.
         </div>
       )}
-      {data?.children.map((c) => <Child key={c.id} c={c} />)}
+      {data?.children.map((c) => <Child key={c.id} c={c} report={[...reports.filter((r) => r.student_id === c.id)].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0]} />)}
 
       {data && data.children.length > 0 && (
         <section>

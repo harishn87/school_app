@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, GraduationCap, Users, Wallet, CalendarCheck, LogOut, School, UserCog, CreditCard, KeyRound,
-  AlertTriangle, NotebookPen, FileText, Bus, PartyPopper,
+  AlertTriangle, NotebookPen, FileText, Bus, PartyPopper, ClipboardList,
 } from "lucide-react";
 
 const ALL_NAV = [
@@ -10,10 +10,11 @@ const ALL_NAV = [
   { to: "/app/diary", label: "Class diary", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary" },
   { to: "/app/students", label: "Students", parentLabel: "My children", icon: GraduationCap, testid: "nav-students" },
   { to: "/app/classes", label: "Classes", icon: Users, testid: "nav-classes", roles: ["admin", "teacher"] },
-  { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees" },
+  { to: "/app/progress", label: "Progress reports", parentLabel: "Progress", icon: ClipboardList, testid: "nav-progress" },
+  { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", roles: ["admin", "parent"] },
   { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance" },
   { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", roles: ["admin", "teacher"] },
-  { to: "/app/transport", label: "Transport", icon: Bus, testid: "nav-transport", roles: ["admin", "teacher"] },
+  { to: "/app/transport", label: "Transport", icon: Bus, testid: "nav-transport", roles: ["admin"] },
   { to: "/app/letters", label: "Letters", icon: FileText, testid: "nav-letters", roles: ["admin"] },
   { to: "/app/users", label: "Users", icon: UserCog, testid: "nav-users", roles: ["admin"] },
   { to: "/app/billing", label: "Plan & billing", icon: CreditCard, testid: "nav-billing", roles: ["admin"] },
@@ -56,8 +57,8 @@ export default function DashboardLayout() {
   const nav = ALL_NAV.filter((n) => !n.roles || n.roles.includes(user?.role))
     .map((n) => ({ ...n, label: parent && n.parentLabel ? n.parentLabel : n.label }));
   const mobileOrder = parent
-    ? ["/app", "/app/diary", "/app/fees", "/app/attendance", "/app/students"]
-    : ["/app", "/app/diary", "/app/students", "/app/attendance", "/app/fees"];
+    ? ["/app", "/app/progress", "/app/diary", "/app/fees", "/app/attendance"]
+    : ["/app", "/app/diary", "/app/students", "/app/attendance", user?.role === "teacher" ? "/app/progress" : "/app/fees"];
   const mobileNav = mobileOrder.map((to) => nav.find((n) => n.to === to)).filter(Boolean);
   const signOut = async () => { await logout(); navigate("/login"); };
 
