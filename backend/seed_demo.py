@@ -4,7 +4,7 @@
   - one parent login with two children (in Class 3 and Class 7)
   - six class teachers (Ravi Kumar: Class 3 and Class 4), a secondary teacher on some classes, and a class attender for each
   - Term 1 fees (some paid, some part paid, some unpaid), Term 1 and Term 2 progress reports, this month's attendance, holidays
-  - two earlier years (2024-25 and 2025-26) of progress reports for every term and of fee records, for history views
+  - two earlier years (2024-25 and 2025-26) of progress reports for every term, fee records and daily attendance, for history views
 
 Safe to run again: anything that already exists is skipped.
 Usage:  python seed_demo.py [--url http://localhost:8001] [--school demo]
@@ -221,6 +221,23 @@ def main():
                                              "due_date": d, "paid_date": d if paid else None}), "add past fee")
                 added += 1
     print(f"Past-year fee records added: {added}")
+
+    # Past-year attendance: every school day from mid June to the end of March (Sundays off), one request per day
+    att_prop = {s["id"]: rnd.choice([.99, .97, .95, .93, .9, .85, .78]) for s in all_students}
+    for year, start, end in (("2024-25", date(2024, 6, 12), date(2025, 3, 28)), ("2025-26", date(2025, 6, 11), date(2026, 3, 28))):
+        if need(c.call("GET", f"/attendance?date={start.isoformat()}"), "check attendance"):
+            continue
+        day, n_days = start, 0
+        while day <= end:
+            if day.weekday() != 6:
+                marks = []
+                for s in all_students:
+                    r = rnd.random()
+                    marks.append({"student_id": s["id"], "status": "present" if r < att_prop[s["id"]] else ("late" if r < att_prop[s["id"]] + .03 else "absent")})
+                need(c.call("POST", "/attendance/batch", {"date": day.isoformat(), "marks": marks}), "past attendance")
+                n_days += 1
+            day += timedelta(days=1)
+        print(f"{year}: attendance marked for {n_days} school days.")
 
     # Parent login (one parent, two children)
     code, data = c.call("POST", "/users", {"name": "Lakshmi Reddy", "email": PARENT_EMAIL, "role": "parent", "password": PARENT_PASSWORD})

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import StudentFormModal from "@/components/StudentFormModal";
 import ReportCard from "@/components/ReportCard";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 export default function StudentDetailPage() {
   const { id } = useParams();
@@ -18,6 +19,10 @@ export default function StudentDetailPage() {
   const [classes, setClasses] = useState([]);
   const [showEdit, setShowEdit] = useState(false);
   const [reports, setReports] = useState([]);
+  const [fees, setFees] = useState([]);
+  const { years, current } = useAcademicYears();
+  const [year, setYear] = useState("");
+  const yr = year || current;
 
   const load = useCallback(async () => {
     try {
@@ -30,7 +35,11 @@ export default function StudentDetailPage() {
     } catch (e) { toast.error("Could not load student"); }
   }, [id]);
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { api.get("/reports", { params: { student_id: id } }).then((r) => setReports(r.data)).catch(() => {}); }, [id]);
+  useEffect(() => {
+    if (!yr) return;
+    api.get("/reports", { params: { student_id: id, academic_year: yr } }).then((r) => setReports(r.data)).catch(() => {});
+    api.get("/fees", { params: { student_id: id, academic_year: yr } }).then((r) => setFees(r.data)).catch(() => setFees([]));
+  }, [id, yr]);
 
   const onDelete = async () => {
     if (!confirm("Delete this student?")) return;
@@ -99,12 +108,27 @@ export default function StudentDetailPage() {
 
       <div className="ui-card p-6" data-testid="academics">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="font-heading text-2xl font-semibold">Academics</h2>
+          <h2 className="font-heading text-2xl font-semibold">Academics &amp; fees</h2>
+          <YearSelect chips years={years} current={current} value={yr} onChange={setYear} id="sd-year" />
           {canEdit && student.class_id && <Link to={`/app/progress?class=${student.class_id}`} className="ui-btn text-sm" data-testid="update-progress-link">{user?.role === "teacher" ? "Update progress report" : "View analysis"}</Link>}
         </div>
         {reports.length > 0 && (
           <div className="mt-4 grid lg:grid-cols-2 gap-4" data-testid="academics-reports">
             {reports.map((r) => <ReportCard key={r.id} report={r} compact />)}
+          </div>
+        )}
+        {fees.length > 0 && (
+          <div className="mt-4" data-testid="student-fees">
+            <div className="text-xs font-medium text-slate-500 mb-2">Fees · {yr}</div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {fees.map((f) => (
+                <div key={f.id} className="ui-card !shadow-sm p-4">
+                  <div className="text-xs text-slate-500">{f.term || f.title || "Fee"}</div>
+                  <div className="font-heading text-xl font-semibold">₹{Number(f.amount || 0).toLocaleString("en-IN")}</div>
+                  <div className="text-xs mt-1 capitalize">{f.status}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         {reports.length === 0 && (!student.grades || student.grades.length === 0) ? (

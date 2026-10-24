@@ -178,7 +178,7 @@ function StaffProgress() {
         </form>
       </div>}
 
-      {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}<YearSelect years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} id="pr-year" /></>} year={year} cols={ys.years.length > 1 ? 4 : 3} />}
+      {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}<YearSelect years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} id="pr-year" /></>} year={year} cols={4} />}
 
       {view === "marks" && <div className="ui-card overflow-x-auto">
         <table className="w-full text-sm" data-testid="progress-table">

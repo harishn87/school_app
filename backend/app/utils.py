@@ -14,6 +14,12 @@ def current_year() -> str:
     return f"{start}-{str(start + 1)[2:]}"
 
 
+def year_bounds(year: str) -> tuple:
+    """First and last day of an academic year string like '2025-26' (April to March)."""
+    start = int(year[:4])
+    return f"{start}-04-01", f"{start + 1}-03-31"
+
+
 def year_q(year: str | None = None, field: str = "academic_year") -> dict:
     """Query fragment for one academic year. Records saved before years existed count as the current year."""
     year = year or current_year()

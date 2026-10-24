@@ -51,3 +51,41 @@ def test_fees_per_year_and_dashboard_counts_current_only(server, new_client):
     server.put(f"/api/fees/{old['id']}", json={"student_id": sid, "term": "Term 1", "amount": 5000, "paid_amount": 4000})
     assert server.get("/api/fees", params={"student_id": sid, "academic_year": "2024-25"}).json()[0]["paid_amount"] == 4000
     assert server.get("/api/dashboard/stats").json()["fees_collected"] == 400
+
+
+def test_dashboards_follow_the_chosen_year(server, new_client):
+    x = _setup(server, new_client)
+    sid, cid = x["k5"]["id"], x["c5"]["id"]
+    _batch(server, cid, sid, "Term 1", 80)
+    _batch(server, cid, sid, "Term 1", 50, "2024-25")
+    server.post("/api/fees", json={"student_id": sid, "term": "Term 1", "amount": 1000, "paid_amount": 1000})
+    server.post("/api/fees", json={"student_id": sid, "term": "Term 1", "amount": 4000, "paid_amount": 1000, "academic_year": "2024-25"})
+    server.post("/api/attendance/batch", json={"date": "2024-08-05", "marks": [{"student_id": sid, "status": "present"}]})
+    server.post("/api/attendance/batch", json={"date": "2024-08-06", "marks": [{"student_id": sid, "status": "absent"}]})
+    cur = server.get("/api/dashboard/school").json()
+    assert cur["is_current"] and [s["grade_avg"] for s in cur["students"] if s["id"] == sid] == [80]
+    old = server.get("/api/dashboard/school", params={"academic_year": "2024-25"}).json()
+    assert old["academic_year"] == "2024-25" and not old["is_current"]
+    row = next(s for s in old["students"] if s["id"] == sid)
+    assert (row["grade_avg"], row["fees_total"], row["fees_pending"], row["attendance_pct"]) == (50, 4000, 3000, 50)
+    assert old["today"]["present"] == 0 and len(old["monthly_attendance"]) == 12
+    ov = server.get("/api/dashboard/overview", params={"academic_year": "2024-25"}).json()
+    r2 = next(s for s in ov["students"] if s["id"] == sid)
+    assert (r2["grade_avg"], r2["fees_pending"]) == (50, 3000) and ov["totals"]["fees_pending"] == 3000
+    assert server.get("/api/dashboard/overview").json()["totals"]["fees_pending"] == 0
+
+
+
+def test_attendance_year_totals(server, new_client):
+    x = _setup(server, new_client)
+    sid, cid = x["k5"]["id"], x["c5"]["id"]
+    for d, st in (("2024-08-05", "present"), ("2024-08-06", "absent"), ("2025-01-10", "late")):
+        r = x["t1"].post("/api/attendance/batch", json={"date": d, "class_id": cid, "marks": [{"student_id": sid, "status": st}]})
+        assert r.status_code in (200, 201), r.text
+    y = x["t1"].get("/api/attendance/year", params={"academic_year": "2024-25"}).json()
+    assert (y["present"], y["late"], y["absent"], y["school_days"], y["percent"]) == (1, 1, 1, 3, 67)
+    assert len(y["months"]) == 12 and y["months"][0]["month"] == "2024-04" and y["months"][4]["absent"] == 1
+    assert y["classes"][0]["class_id"] == cid
+    assert x["mom"].get("/api/attendance/year", params={"academic_year": "2024-25"}).json()["school_days"] == 3
+    assert x["other"].get("/api/attendance/year", params={"academic_year": "2024-25"}).json()["school_days"] == 0
+    assert x["t1"].get("/api/attendance/year").json()["school_days"] == 0

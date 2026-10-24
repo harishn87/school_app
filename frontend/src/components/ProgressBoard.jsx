@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import WagonWheel from "@/components/WagonWheel";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 import { AlertTriangle, ArrowDown, ArrowUp, Search } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
@@ -67,14 +68,16 @@ export default function ProgressBoard() {
   const [sort, setSort] = useState({ key: "pending", dir: -1 });
   const [only, setOnly] = useState("");   // "" | "fees" | "attendance" | "grades"
   const [shown, setShown] = useState(PAGE);
+  const ys = useAcademicYears();
+  const [year, setYear] = useState("");
 
   useEffect(() => {
-    api.get("/dashboard/overview").then((r) => {
+    api.get("/dashboard/overview", { params: { academic_year: year || undefined } }).then((r) => {
       setData(r.data);
       // open on a metric that actually has data
       if (!r.data.classes.some((c) => c.attendance_pct != null) && r.data.classes.some((c) => c.grade_avg != null)) setMetric("grade");
     }).catch(() => setData({ students: [], classes: [], totals: {} }));
-  }, []);
+  }, [year]);
 
   const showFees = !data || data.totals.fees_pending != null;
   const filterTo = (k) => { setOnly(k); setShown(PAGE); setTimeout(() => listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); };
@@ -104,7 +107,7 @@ export default function ProgressBoard() {
     value: metric === "attendance" ? c.attendance_pct : metric === "grade" ? c.grade_avg : (c.fees_total ? Math.round((c.fees_paid / c.fees_total) * 100) : null),
   }));
   const metrics = [["attendance", "Attendance"], ["grade", "Grades"], ...(showFees ? [["fees", "Fees collected"]] : [])];
-  const sub = { attendance: "Attendance over the last 30 days.", grade: "Average mark from academics.", fees: "Share of billed fees already collected." }[metric];
+  const sub = { attendance: year ? `Attendance across ${year}.` : "Attendance over the last 30 days.", grade: "Average mark from academics.", fees: "Share of billed fees already collected." }[metric];
   const head = (key, label, right) => (
     <th scope="col" className={`table-head px-4 py-2.5 ${right ? "text-right" : "text-left"}`}>
       <button type="button" className="inline-flex items-center gap-1 hover:text-[#2B4BFF]" onClick={() => setSort((s) => ({ key, dir: s.key === key ? -s.dir : 1 }))}>
@@ -118,6 +121,7 @@ export default function ProgressBoard() {
 
   return (
     <section className="space-y-5" data-testid="progress-board">
+      <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => { setYear(y === ys.current ? "" : y); setShown(PAGE); }} />
       <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="ui-card p-5" data-testid="class-summary">
           <div className="flex flex-wrap items-start justify-between gap-3">

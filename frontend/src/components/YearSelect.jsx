@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
+// Indian school years run April to March, e.g. "2026-27". Used only if the server can't tell us.
+const guessYear = () => { const d = new Date(); const s = d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; return `${s}-${String(s + 1).slice(2)}`; };
+
 /** Academic years that have data, newest first. The current year is always included. */
 export function useAcademicYears() {
   const [info, setInfo] = useState({ current: "", years: [], loaded: false });
-  useEffect(() => { api.get("/academic-years").then((r) => setInfo({ ...r.data, loaded: true })).catch(() => setInfo((i) => ({ ...i, loaded: true }))); }, []);
+  useEffect(() => {
+    api.get("/academic-years").then((r) => setInfo({ ...r.data, loaded: true }))
+      .catch(() => { const y = guessYear(); setInfo({ current: y, years: [y], loaded: true }); });
+  }, []);
   return info;
 }
 
-/** A compact year picker. Renders nothing while there is only one year to choose from. */
+/** A compact year picker. Always shown, so it is clear where earlier years will appear. */
 export default function YearSelect({ years, current, value, onChange, id = "year-select", chips = false }) {
-  if (!years || years.length < 2) return null;
+  if (!years || years.length < 1) return null;
   const v = value || current;
   if (chips) {
     return (
@@ -21,6 +27,7 @@ export default function YearSelect({ years, current, value, onChange, id = "year
             {y}{y === current ? " (this year)" : ""}
           </button>
         ))}
+        {years.length < 2 && <span className="text-xs text-slate-500" data-testid="year-hint">Earlier years appear here once their data is added.</span>}
       </div>
     );
   }

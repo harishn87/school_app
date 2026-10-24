@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
 import WagonWheel from "@/components/WagonWheel";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 const rank = (n = "") => { const m = n.match(/\d+/); return (/^(pp|nursery|lkg|ukg|kg)/i.test(n.trim()) ? 0 : 100) + (m ? Number(m[0]) : 0); };
 const avg = (v) => { const x = v.filter((n) => n != null); return x.length ? Math.round(x.reduce((a, b) => a + b, 0) / x.length) : null; };
@@ -88,10 +89,12 @@ export default function ManagementDashboard() {
   const [err, setErr] = useState("");
   const [metric, setMetric] = useState("attendance");
   const [subjClass, setSubjClass] = useState("");
+  const ys = useAcademicYears();
+  const [year, setYear] = useState("");
   const navigate = useNavigate();
   const classWheelRef = useRef(null);
 
-  useEffect(() => { api.get("/dashboard/school").then((r) => setD(r.data)).catch((e) => setErr(errorMessage(e))); }, []);
+  useEffect(() => { api.get("/dashboard/school", { params: { academic_year: year || undefined } }).then((r) => setD(r.data)).catch((e) => setErr(errorMessage(e))); }, [year]);
 
   const classes = useMemo(() => (d ? [...d.classes].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name)) : []), [d]);
   const wheel = useMemo(() => {
@@ -119,16 +122,23 @@ export default function ManagementDashboard() {
   const t = d.today, marked = t.present + t.late + t.absent;
   const billed = d.students.reduce((a, s) => a + s.fees_total, 0), paid = d.students.reduce((a, s) => a + s.fees_paid, 0);
   const grade = avg(d.students.map((s) => s.grade_avg));
+  const current = d.is_current !== false;
+  const mk = d.monthly_attendance.filter((m) => m.pct != null);
+  const yearAtt = mk.length ? Math.round(mk.reduce((a, m) => a + m.pct * m.marked, 0) / Math.max(1, mk.reduce((a, m) => a + m.marked, 0))) : null;
   const subjMetric = metric.startsWith("subject:") ? metric.slice(8) : null;
-  const metricInfo = subjMetric ? [`${subjMetric} marks`, `Average ${subjMetric} mark in each class. Click a class to open it.`] : { attendance: ["Attendance, last 30 days", "Share of marked days present, averaged over each class's students."], grade: ["Average grade", "Average of progress report marks."], fees: ["Fee collection", "Fees collected as a share of fees billed."] }[metric];
+  const metricInfo = subjMetric ? [`${subjMetric} marks`, `Average ${subjMetric} mark in each class. Click a class to open it.`] : { attendance: [current ? "Attendance, last 30 days" : `Attendance, ${d.academic_year}`, "Share of marked days present, averaged over each class's students."], grade: ["Average grade", "Average of progress report marks."], fees: ["Fee collection", "Fees collected as a share of fees billed."] }[metric];
 
   return (
     <div className="space-y-6" data-testid="management-dashboard">
-      <PageHero title="School dashboard" subtitle={`The whole school at a glance, as of ${d.as_of}. Wheels, trends and a pivot table for any question.`} />
+      <PageHero title="School dashboard" subtitle={current ? `The whole school at a glance, as of ${d.as_of}. Click any wing of a wheel to open the data behind it.` : `The whole school in ${d.academic_year}: every student's marks, fees and attendance for that year.`} />
+
+      <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Tile label="Students" value={n} note={`${classes.length} classes`} testid="kpi-students" />
-        <Tile label="Present today" value={marked ? `${Math.round(((t.present + t.late) / marked) * 100)}%` : "-"} note={marked ? `${t.absent} absent, ${t.unmarked} not marked` : "Attendance not marked yet"} testid="kpi-today" />
+        {current
+          ? <Tile label="Present today" value={marked ? `${Math.round(((t.present + t.late) / marked) * 100)}%` : "-"} note={marked ? `${t.absent} absent, ${t.unmarked} not marked` : "Attendance not marked yet"} testid="kpi-today" />
+          : <Tile label="Attendance" value={yearAtt == null ? "-" : `${yearAtt}%`} note={`Whole of ${d.academic_year}`} testid="kpi-today" />}
         <Tile label="Fees collected" value={billed ? `${Math.round((paid / billed) * 100)}%` : "-"} note={`${formatMoney(billed - paid)} pending`} testid="kpi-fees" />
         <Tile label="Average grade" value={grade == null ? "-" : `${grade}%`} note="All subjects" testid="kpi-grade" />
       </div>
