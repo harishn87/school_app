@@ -122,6 +122,7 @@ class ClassIn(BaseModel):
 
 class FeeIn(BaseModel):
     student_id: str
+    academic_year: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     term: str = Field(min_length=1, max_length=100)
     amount: float = Field(ge=0)
     paid_amount: float = Field(default=0, ge=0)
@@ -256,4 +257,5 @@ class ReportEntryIn(BaseModel):
 class ReportBatchIn(BaseModel):
     class_id: str
     term: str = Field(min_length=1, max_length=100)
+    academic_year: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     entries: List[ReportEntryIn] = Field(max_length=300)

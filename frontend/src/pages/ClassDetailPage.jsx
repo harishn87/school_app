@@ -1,6 +1,6 @@
 import PageHero from "@/components/PageHero";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CalendarCheck, GraduationCap, Phone, TrendingUp, UserRound, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -34,7 +34,8 @@ export default function ClassDetailPage() {
   const { user } = useAuth();
   const teacherView = user?.role === "teacher";
   const [posts, setPosts] = useState([]);
-  const [day, setDay] = useState(new Date().toLocaleDateString("en-CA"));
+  const [qs] = useSearchParams();
+  const [day, setDay] = useState(/^\d{4}-\d{2}-\d{2}$/.test(qs.get("date") || "") ? qs.get("date") : new Date().toLocaleDateString("en-CA"));
   const [dayMarks, setDayMarks] = useState([]);
   const [missing, setMissing] = useState(false);
 

@@ -94,7 +94,11 @@ async def ensure_tenant_indexes(db) -> None:
     await db.posts.create_index("id", unique=True)
     await db.posts.create_index([("class_id", 1), ("date", -1)])
     await db.reports.create_index("id", unique=True)
-    await db.reports.create_index([("student_id", 1), ("term", 1)], unique=True)
+    try:    # older databases had one report per student and term; reports are now also per academic year
+        await db.reports.drop_index("student_id_1_term_1")
+    except Exception:
+        pass
+    await db.reports.create_index([("student_id", 1), ("term", 1), ("academic_year", 1)], unique=True)
     await db.reports.create_index("class_id")
     await db.holidays.create_index("id", unique=True)
     await db.holidays.create_index("date")

@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Pencil, Phone } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Phone, CheckCircle2, Clock, XCircle, CircleDashed } from "lucide-react";
 import { api } from "@/lib/api";
 
 const STATUS = {
@@ -16,36 +16,57 @@ const rank = (n = "") => {
 };
 const shift = (iso, n) => { const d = new Date(iso + "T00:00"); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
 
-function Tile({ label, value, tone, testid }) {
-  return <div className={`rounded-2xl p-4 ${tone}`}><div className="text-xs font-medium">{label}</div><div className="font-heading text-3xl font-semibold mt-1" data-testid={testid}>{value}</div></div>;
+/** Counts up to a number on mount and whenever it changes. Static for people who prefer reduced motion. */
+function CountUp({ value, suffix = "", testid }) {
+  const [shown, setShown] = useState(0);
+  const from = useRef(0);
+  useEffect(() => {
+    if (value == null || typeof value !== "number") return undefined;
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) { setShown(value); return undefined; }
+    let raf; const t0 = performance.now(), start = from.current, dur = 900;
+    const tick = (t) => { const k = Math.min((t - t0) / dur, 1), e = 1 - Math.pow(1 - k, 3); setShown(Math.round(start + (value - start) * e)); if (k < 1) raf = requestAnimationFrame(tick); else from.current = value; };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <span data-testid={testid}>{value == null ? "-" : `${shown}${suffix}`}</span>;
 }
 
-function Split({ c }) {
-  const parts = [["present", c.present, "bg-emerald-500"], ["late", c.late, "bg-amber-400"], ["absent", c.absent, "bg-rose-500"], ["none", c.unmarked, "bg-slate-200"]].filter((p) => p[1] > 0);
+function Tile({ label, value, grad, icon: Icon, i, testid }) {
   return (
-    <div className="flex h-2.5 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={`${c.present} present, ${c.late} late, ${c.absent} absent, ${c.unmarked} not marked`}>
-      {parts.map(([k, n, cls]) => <div key={k} className={`${cls} rounded-sm`} style={{ flex: n }} />)}
+    <div className={`tile-shine anim-pop rounded-2xl p-4 text-white shadow-lg hover:-translate-y-1 hover:shadow-xl transition-all ${grad}`} style={{ animationDelay: `${i * 90}ms` }}>
+      <div className="flex items-center justify-between"><span className="text-sm font-medium text-white/90">{label}</span><Icon className="h-5 w-5 text-white/90" aria-hidden="true" /></div>
+      <div className="font-heading text-4xl font-semibold mt-2 tabular-nums"><CountUp value={value} testid={testid} /></div>
     </div>
   );
 }
 
-function ClassCard({ c, date, open, onToggle, canMark }) {
+function Split({ c }) {
+  const parts = [["present", c.present, "bg-gradient-to-r from-emerald-400 to-emerald-500"], ["late", c.late, "bg-gradient-to-r from-amber-300 to-orange-400"], ["absent", c.absent, "bg-gradient-to-r from-rose-400 to-red-500"], ["none", c.unmarked, "bg-slate-200"]].filter((p) => p[1] > 0);
+  return (
+    <div className="flex h-3 gap-[2px] overflow-hidden rounded-full bg-slate-100" role="img" aria-label={`${c.present} present, ${c.late} late, ${c.absent} absent, ${c.unmarked} not marked`}>
+      {parts.map(([k, n, cls], i) => <div key={k} className={`${cls} rounded-sm anim-grow`} style={{ flex: n, animationDelay: `${200 + i * 140}ms` }} />)}
+    </div>
+  );
+}
+
+function ClassCard({ c, date, canMark, i }) {
+  const tone = c.percent == null ? ["#CBD5E1", "text-slate-400"] : c.percent >= 90 ? ["#10B981", "text-emerald-600"] : c.percent >= 75 ? ["#F59E0B", "text-amber-600"] : ["#F43F5E", "text-rose-600"];
   const flagged = c.students.filter((s) => s.status === "absent" || s.status === "late");
   return (
-    <section className="ui-card p-5" data-testid={`day-class-${c.class_id}`}>
+    <section className="ui-card hoverable relative p-5 pl-6 cursor-pointer focus-within:ring-2 focus-within:ring-[#2B4BFF] anim-pop" style={{ animationDelay: `${350 + Math.min(i, 10) * 70}ms`, boxShadow: `inset 5px 0 0 ${tone[0]}` }} data-testid={`day-class-${c.class_id}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="font-heading text-lg font-semibold"><Link className="hover:text-[#2B4BFF]" to={`/app/classes/${c.class_id}`}>{c.class_name}</Link></h2>
+          <h2 className="font-heading text-lg font-semibold"><Link className="after:absolute after:inset-0 after:z-0 focus:outline-none" to={`/app/classes/${c.class_id}?date=${date}`} aria-label={`Open ${c.class_name}`} data-testid={`day-open-${c.class_id}`}>{c.class_name}</Link></h2>
           <p className="text-sm text-slate-500">
             {c.teacher ? `Class teacher ${c.teacher}` : "No class teacher"}{c.secondary_teacher ? `, with ${c.secondary_teacher}` : ""}
           </p>
           {c.attender_name && (
             <p className="mt-0.5 text-sm text-slate-500 inline-flex items-center gap-1.5"><Phone className="h-3.5 w-3.5" aria-hidden="true" /> Attender {c.attender_name}
-              {c.attender_phone && <a href={`tel:${c.attender_phone.replace(/\s/g, "")}`} className="text-[#2B4BFF] hover:underline">{c.attender_phone}</a>}</p>
+              {c.attender_phone && <a href={`tel:${c.attender_phone.replace(/\s/g, "")}`} className="relative z-10 ml-1.5 text-[#2B4BFF] hover:underline">{c.attender_phone}</a>}</p>
           )}
         </div>
         <div className="text-right">
-          <div className="font-heading text-3xl font-semibold leading-none" data-testid={`day-pct-${c.class_id}`}>{c.percent == null ? "-" : `${c.percent}%`}</div>
+          <div className={`font-heading text-4xl font-semibold leading-none tabular-nums ${tone[1]}`}><CountUp value={c.percent} suffix="%" testid={`day-pct-${c.class_id}`} /></div>
           <div className="text-xs text-slate-500 mt-1">present</div>
         </div>
       </div>
@@ -53,7 +74,7 @@ function ClassCard({ c, date, open, onToggle, canMark }) {
       <div className="mt-4"><Split c={c} /></div>
       <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
         <span>{c.total} students</span>
-        <span><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500 mr-1.5" />{c.present} present</span>
+        <span><i className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500 mr-1.5" />{c.present} present</span>
         <span><i className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400 mr-1.5" />{c.late} late</span>
         <span><i className="inline-block h-2.5 w-2.5 rounded-sm bg-rose-500 mr-1.5" />{c.absent} absent</span>
         {c.unmarked > 0 && <span><i className="inline-block h-2.5 w-2.5 rounded-sm bg-slate-200 mr-1.5" />{c.unmarked} not marked</span>}
@@ -67,29 +88,11 @@ function ClassCard({ c, date, open, onToggle, canMark }) {
         </p>
       )}
 
-      <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button type="button" onClick={onToggle} aria-expanded={open} className="inline-flex items-center gap-1 text-sm font-medium text-[#2B4BFF] hover:underline" data-testid={`day-toggle-${c.class_id}`}>
-          <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" /> {open ? "Hide students" : "All students"}
-        </button>
-        {canMark && <Link to={`/app/attendance?date=${date}&class=${c.class_id}`} className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#2B4BFF]">
-          <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Mark or edit
-        </Link>}
-      </div>
-
-      {open && (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-[#EEF0F6]">
-          <table className="w-full text-sm" data-testid={`day-roster-${c.class_id}`}>
-            <tbody className="divide-y divide-[#EEF0F6]">
-              {c.students.map((s) => (
-                <tr key={s.id}>
-                  <td className="px-3 py-2 w-12 text-slate-400 tabular-nums">{s.roll_number}</td>
-                  <td className="px-3 py-2 font-medium">{s.name}</td>
-                  <td className="px-3 py-2 text-right"><span className={`pill ${STATUS[s.status || "none"][1]}`}>{STATUS[s.status || "none"][0]}</span></td>
-                </tr>
-              ))}
-              {c.students.length === 0 && <tr><td className="px-3 py-4 text-slate-500">No students in this class.</td></tr>}
-            </tbody>
-          </table>
+      {canMark && (
+        <div className="mt-3 relative z-10">
+          <Link to={`/app/attendance?date=${date}&class=${c.class_id}`} className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#2B4BFF]">
+            <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Mark or edit
+          </Link>
         </div>
       )}
     </section>
@@ -104,7 +107,6 @@ export default function DayAttendancePage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
-  const [open, setOpen] = useState({});
 
   useEffect(() => {
     let live = true;
@@ -142,14 +144,14 @@ export default function DayAttendancePage() {
       {data && (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <Tile label="Present" value={t.present} tone="bg-emerald-50 text-emerald-900" testid="day-t-present" />
-            <Tile label="Late" value={t.late} tone="bg-amber-50 text-amber-900" testid="day-t-late" />
-            <Tile label="Absent" value={t.absent} tone="bg-rose-50 text-rose-900" testid="day-t-absent" />
-            <Tile label="Not marked" value={t.unmarked} tone="bg-white border border-[#E7E9F1]" testid="day-t-unmarked" />
+            <Tile i={0} label="Present" value={t.present} icon={CheckCircle2} grad="bg-gradient-to-br from-emerald-400 to-emerald-600 shadow-emerald-500/30" testid="day-t-present" />
+            <Tile i={1} label="Late" value={t.late} icon={Clock} grad="bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/30" testid="day-t-late" />
+            <Tile i={2} label="Absent" value={t.absent} icon={XCircle} grad="bg-gradient-to-br from-rose-400 to-red-600 shadow-rose-500/30" testid="day-t-absent" />
+            <Tile i={3} label="Not marked" value={t.unmarked} icon={CircleDashed} grad="bg-gradient-to-br from-[#4F6BFF] to-[#2B4BFF] shadow-[#2B4BFF]/30" testid="day-t-unmarked" />
           </div>
           {classes.length === 0
             ? <div className="ui-card p-8 text-center text-slate-500">No classes to show.</div>
-            : <div className="grid lg:grid-cols-2 gap-5">{classes.map((c) => <ClassCard key={c.class_id} c={c} canMark={user?.role === "teacher"} date={date} open={!!open[c.class_id]} onToggle={() => setOpen((o) => ({ ...o, [c.class_id]: !o[c.class_id] }))} />)}</div>}
+            : <div className="grid lg:grid-cols-2 gap-5">{classes.map((c) => <ClassCard key={c.class_id} i={classes.indexOf(c)} c={c} canMark={user?.role === "teacher"} date={date} />)}</div>}
         </>
       )}
     </div>

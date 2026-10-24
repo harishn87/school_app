@@ -14,7 +14,7 @@ from ..models import (AttendanceBatchIn, ClassIn, FeeIn, ResetPasswordIn, Studen
                       UserUpdateIn)
 from ..plans import limits_for
 from ..security import TenantContext, get_ctx, hash_password, require_roles
-from ..utils import new_id, now_iso, safe_regex
+from ..utils import current_year, new_id, now_iso, safe_regex, year_q
 
 router = APIRouter(tags=["school"])
 
@@ -245,7 +245,7 @@ async def delete_student(student_id: str, ctx: TenantContext = Depends(require_r
 
 # ---------- fees ----------
 @router.get("/fees")
-async def list_fees(student_id: Optional[str] = None, ctx: TenantContext = Depends(require_roles("admin", "parent"))):
+async def list_fees(student_id: Optional[str] = None, academic_year: Optional[str] = Query(None, max_length=20), ctx: TenantContext = Depends(require_roles("admin", "parent"))):
     query: dict = {}
     ids = await visible_student_ids(ctx)
     if ids is not None:
@@ -254,7 +254,12 @@ async def list_fees(student_id: Optional[str] = None, ctx: TenantContext = Depen
         if ids is not None and student_id not in ids:
             return []
         query["student_id"] = student_id
-    return await ctx.db.fees.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    if academic_year != "all":
+        query.update(year_q(academic_year))
+    rows = await ctx.db.fees.find(query, {"_id": 0}).sort("created_at", -1).to_list(5000)
+    for r in rows:
+        r["academic_year"] = r.get("academic_year") or current_year()
+    return rows
 
 
 async def _check_student(ctx: TenantContext, student_id: str) -> None:
@@ -266,6 +271,7 @@ async def _check_student(ctx: TenantContext, student_id: str) -> None:
 async def create_fee(payload: FeeIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_student(ctx, payload.student_id)
     doc = {**payload.model_dump(), "id": new_id(), "created_at": now_iso()}
+    doc["academic_year"] = doc.get("academic_year") or current_year()
     doc["status"] = fee_status(doc["amount"], doc["paid_amount"])
     await ctx.db.fees.insert_one(dict(doc))
     return doc
@@ -275,6 +281,8 @@ async def create_fee(payload: FeeIn, ctx: TenantContext = Depends(require_roles(
 async def update_fee(fee_id: str, payload: FeeIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_student(ctx, payload.student_id)
     updates = payload.model_dump()
+    if not updates.get("academic_year"):
+        updates.pop("academic_year", None)
     updates["status"] = fee_status(updates["amount"], updates["paid_amount"])
     res = await ctx.db.fees.update_one({"id": fee_id}, {"$set": updates})
     if res.matched_count == 0:
@@ -334,7 +342,7 @@ async def list_attendance(date_str: Optional[str] = Query(None, alias="date"), c
 async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
     scope = await scope_for(ctx)
     ids = await visible_student_ids(ctx)
-    fee_q = {} if ids is None else {"student_id": {"$in": ids}}
+    fee_q = {**year_q(), **({} if ids is None else {"student_id": {"$in": ids}})}
 
     total_students = await ctx.db.students.count_documents({**scope, "status": "active"})
     total_left = await ctx.db.students.count_documents({**scope, "status": "left"})

@@ -7,6 +7,7 @@ import { formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 export default function FeesPage() {
   const { user } = useAuth();
@@ -15,6 +16,9 @@ export default function FeesPage() {
   const [params, setParams] = useSearchParams();
   const studentId = params.get("student") || "";
   const autoOpened = useRef(false);
+  const ys = useAcademicYears();
+  const [year, setYear] = useState("");
+  const activeYear = year || ys.current;
   const [fees, setFees] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [students, setStudents] = useState([]);
@@ -23,12 +27,13 @@ export default function FeesPage() {
   const [form, setForm] = useState({ student_id: "", term: "", amount: 0, paid_amount: 0, due_date: "", paid_date: "", note: "" });
 
   const load = async () => {
-    const [{ data: f }, { data: s }] = await Promise.all([api.get("/fees"), api.get("/students")]);
+    const [{ data: f }, { data: s }] = await Promise.all([api.get("/fees", { params: activeYear ? { academic_year: activeYear } : {} }), api.get("/students")]);
     setFees(f);
     setStudents(s);
     setLoaded(true);
   };
-  useEffect(() => { load(); }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (ys.loaded) load(); }, [activeYear, ys.loaded]);
 
   const sMap = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
@@ -63,7 +68,7 @@ export default function FeesPage() {
       if (!payload.due_date) payload.due_date = null;
       if (!payload.paid_date) payload.paid_date = null;
       if (editing) await api.put(`/fees/${editing.id}`, payload);
-      else await api.post("/fees", payload);
+      else await api.post("/fees", { ...payload, academic_year: activeYear || undefined });
       toast.success("Saved"); setShowForm(false); load();
     } catch (err) { toast.error(errorMessage(err)); }
   };
@@ -90,6 +95,8 @@ export default function FeesPage() {
         </div>
       )}
 
+      <YearSelect chips years={ys.years} current={ys.current} value={activeYear} onChange={setYear} />
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <SummaryCard label="Total billed" value={totals.due} color="bg-[#2B4BFF]" />
         <SummaryCard label="Collected" value={totals.paid} color="bg-emerald-500" />
@@ -112,7 +119,7 @@ export default function FeesPage() {
             </thead>
             <tbody>
               {shown.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No fee records yet.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No fee records for {activeYear || "this year"}.</td></tr>
               )}
               {shown.map((f) => (
                 <tr key={f.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`fee-row-${f.id}`}>

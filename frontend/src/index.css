@@ -111,3 +111,13 @@ a.ui-card:hover, .ui-card.hoverable:hover { box-shadow: 0 2px 4px rgba(15,21,48,
 .table-head th, th.table-head { font-weight: 600; letter-spacing: 0.01em; }
 
 .ruled-light { background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 35px, rgba(255,255,255,.05) 35px, rgba(255,255,255,.05) 36px); }
+
+/* ---- lively motion for status tiles and bars ---- */
+@keyframes pop-in { 0% { opacity: 0; transform: translateY(14px) scale(.94); } 60% { opacity: 1; transform: translateY(-2px) scale(1.02); } 100% { opacity: 1; transform: none; } }
+@keyframes grow-x { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes shine { 0% { transform: translateX(-120%) skewX(-18deg); } 60%, 100% { transform: translateX(260%) skewX(-18deg); } }
+@keyframes breathe { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,.0); } 50% { box-shadow: 0 0 0 6px rgba(255,255,255,.18); } }
+.anim-pop { animation: pop-in .6s cubic-bezier(.2,.9,.3,1.2) both; }
+.anim-grow { transform-origin: left center; animation: grow-x .9s cubic-bezier(.2,.8,.2,1) both; }
+.tile-shine { position: relative; overflow: hidden; }
+.tile-shine::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 3.2s ease-in-out 1s infinite; pointer-events: none; }

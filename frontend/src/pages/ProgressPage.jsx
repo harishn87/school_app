@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import PageHero from "@/components/PageHero";
 import ReportCard from "@/components/ReportCard";
 import { AcademicWheel, StaffAnalysis, TermsWheel } from "@/components/StudentAnalysis";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 const TERMS = ["Term 1", "Term 2", "Term 3", "Annual"];
 const defaultSubjects = (name = "") => (/^(pp|nursery|lkg|ukg)/i.test(name.trim()) ? ["English", "Numbers", "Drawing"] : ["Maths", "English", "Science", "Social"]);
@@ -15,13 +16,18 @@ const defaultSubjects = (name = "") => (/^(pp|nursery|lkg|ukg)/i.test(name.trim(
 function ParentProgress() {
   const [kids, setKids] = useState(null);
   const [reports, setReports] = useState([]);
+  const ys = useAcademicYears();
+  const [year, setYear] = useState("");
   useEffect(() => {
     api.get("/students", { params: { status: "active" } }).then((r) => setKids(r.data)).catch(() => setKids([]));
-    api.get("/reports").then((r) => setReports(r.data)).catch(() => {});
   }, []);
+  useEffect(() => {
+    api.get("/reports", { params: { academic_year: year || undefined } }).then((r) => setReports(r.data)).catch(() => {});
+  }, [year]);
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up" data-testid="progress-parent">
       <PageHero title="Academics" subtitle="Marks and teacher remarks, updated by your child's class teacher." />
+      <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} />
       {kids && kids.length === 0 && <div className="ui-card p-8 text-center text-slate-500">No students are linked to your account yet.</div>}
       {kids?.map((k) => {
         const mine = reports.filter((r) => r.student_id === k.id);
@@ -29,12 +35,12 @@ function ParentProgress() {
           <section key={k.id} className="space-y-3" data-testid={`progress-child-${k.id}`}>
             <h2 className="font-heading text-lg font-semibold">{k.first_name} {k.last_name}</h2>
             {mine.length === 0
-              ? <div className="ui-card p-6 text-sm text-slate-500">No progress report yet. It will appear here as soon as the teacher saves it.</div>
+              ? <div className="ui-card p-6 text-sm text-slate-500">{year && year !== ys.current ? `No report for ${year}.` : "No progress report yet. It will appear here as soon as the teacher saves it."}</div>
               : <>
                   <TermsWheel items={["Term 1", "Term 2", "Term 3", "Annual"].map((t) => ({ label: t, value: mine.find((r) => r.term === t)?.percent ?? null }))} term={mine[0]?.term}
                     onTerm={(t) => document.getElementById(`rc-${k.id}-${t.replace(/\s/g, "")}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
                     title={`${k.first_name}: overall by term`} sub="Click a term to jump to its report." testid={`terms-wheel-${k.id}`} />
-                  <AcademicWheel report={mine[0]} history={mine} studentId={k.id} name={k.first_name} testid={`academic-wheel-${k.id}`} />
+                  <AcademicWheel report={mine[0]} history={mine} studentId={k.id} year={year} name={k.first_name} testid={`academic-wheel-${k.id}`} />
                   <div className="max-w-3xl space-y-3">{mine.map((r) => <ReportCard key={r.id} report={r} />)}</div>
                 </>}
           </section>
@@ -51,6 +57,8 @@ function StaffProgress() {
   const [classes, setClasses] = useState(null);
   const [classId, setClassId] = useState(params.get("class") || "");
   const [term, setTerm] = useState("Term 1");
+  const ys = useAcademicYears();
+  const [year, setYear] = useState("");
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [maxes, setMaxes] = useState({});
@@ -170,7 +178,7 @@ function StaffProgress() {
         </form>
       </div>}
 
-      {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}</>} />}
+      {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}<YearSelect years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} id="pr-year" /></>} year={year} cols={ys.years.length > 1 ? 4 : 3} />}
 
       {view === "marks" && <div className="ui-card overflow-x-auto">
         <table className="w-full text-sm" data-testid="progress-table">

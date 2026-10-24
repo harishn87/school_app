@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from ..models import HolidayIn
 from ..security import TenantContext, get_ctx, require_roles
-from ..utils import new_id, now_iso
+from ..utils import new_id, now_iso, year_q
 from .school import class_teacher_query, fee_status, scope_for
 
 router = APIRouter(tags=["insights"])
@@ -125,7 +125,7 @@ async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin",
             t[1] += 1
             t[0] += 1 if a["status"] in ("present", "late") else 0
     fees: dict = {}
-    async for f in ctx.db.fees.find({}, {"_id": 0, "student_id": 1, "amount": 1, "paid_amount": 1}):
+    async for f in ctx.db.fees.find(year_q(), {"_id": 0, "student_id": 1, "amount": 1, "paid_amount": 1}):
         if f["student_id"] in ids:
             t = fees.setdefault(f["student_id"], [0.0, 0.0])
             t[0] += float(f.get("amount", 0))
@@ -277,7 +277,7 @@ async def dashboard_school(ctx: TenantContext = Depends(require_roles("admin")))
 
     fees: dict = {}
     by_term: dict = {}
-    async for f in ctx.db.fees.find({}, {"_id": 0}):
+    async for f in ctx.db.fees.find(year_q(), {"_id": 0}):
         if f["student_id"] not in ids:
             continue
         amt, paid = float(f.get("amount", 0)), float(f.get("paid_amount", 0))

@@ -17,7 +17,7 @@ export function TermsWheel({ items, term, onTerm, title, sub, testid = "terms-wh
 }
 
 /** Subject wheel for one report, with an optional class-average comparison. */
-export function AcademicWheel({ report, classAvg, testid = "academic-wheel", name, history, studentId }) {
+export function AcademicWheel({ report, classAvg, testid = "academic-wheel", name, history, studentId, year }) {
   const [pick, setPick] = useState(null);
   const navigate = useNavigate();
   const marks = (report?.marks || []).filter((m) => m.score != null);
@@ -34,7 +34,7 @@ export function AcademicWheel({ report, classAvg, testid = "academic-wheel", nam
         <h3 className="font-heading text-lg font-semibold">{name ? `${name}: ` : ""}subject wheel</h3>
         <p className="text-xs text-slate-500 mb-2">Marks as a percentage of the maximum, for {report.term}.</p>
         <WagonWheel items={items} title="Subject marks" testid={`${testid}-chart`} activeLabel={pick}
-          onSelect={(it) => (studentId ? navigate(`/app/progress/subject/${studentId}/${encodeURIComponent(it.label)}`) : setPick((p) => (p === it.label ? null : it.label)))} hint="Click a subject to open it across every term." />
+          onSelect={(it) => (studentId ? navigate(`/app/progress/subject/${studentId}/${encodeURIComponent(it.label)}${year ? `?year=${year}` : ""}`) : setPick((p) => (p === it.label ? null : it.label)))} hint="Click a subject to open it across every term." />
         {pick && (() => {
           const terms = [...(history || [report])].sort((a, b) => TERM_ORDER.indexOf(a.term) - TERM_ORDER.indexOf(b.term))
             .map((r) => { const m = (r.marks || []).find((x) => x.subject === pick && x.score != null); return m ? { t: r.term, v: pctOf(m), m } : null; }).filter(Boolean);
@@ -248,7 +248,7 @@ function StudentTerms({ reports, term }) {
 }
 
 /** Staff view: whole-class analysis by default, with a drill-down to one student. Refreshes by itself. */
-export function StaffAnalysis({ classId, students, term, onTerm, canEnter, lead }) {
+export function StaffAnalysis({ classId, students, term, onTerm, canEnter, lead, year, cols = 3 }) {
   const [sid, setSid] = useState("");           // "" = whole class
   const [allReports, setAllReports] = useState([]);
   const [tick, setTick] = useState(0);
@@ -263,8 +263,8 @@ export function StaffAnalysis({ classId, students, term, onTerm, canEnter, lead 
   }, []);
   useEffect(() => {
     if (!classId) return;
-    api.get("/reports", { params: { class_id: classId } }).then((r) => { setAllReports(r.data); setUpdated(new Date()); }).catch(() => setAllReports([]));
-  }, [classId, tick]);
+    api.get("/reports", { params: { class_id: classId, academic_year: year || undefined } }).then((r) => { setAllReports(r.data); setUpdated(new Date()); }).catch(() => setAllReports([]));
+  }, [classId, tick, year]);
 
   const termReports = useMemo(() => allReports.filter((r) => r.term === term), [allReports, term]);
   const availTerms = TERM_ORDER.filter((t) => allReports.some((r) => r.term === t));
@@ -281,7 +281,7 @@ export function StaffAnalysis({ classId, students, term, onTerm, canEnter, lead 
   return (
     <div className="space-y-5" data-testid="analysis-view">
       <div className="ui-card p-4" data-testid="analysis-filters">
-        <div className="grid gap-3 sm:grid-cols-3 items-end">
+        <div className={`grid gap-3 items-end ${cols === 4 ? "sm:grid-cols-2 lg:grid-cols-4" : "sm:grid-cols-3"}`}>
           {lead}
           <div><label className="field-label" htmlFor="an-student">View</label>
             <select id="an-student" className="ui-input" value={sid} onChange={(e) => setSid(e.target.value)} data-testid="analysis-student">
@@ -296,7 +296,7 @@ export function StaffAnalysis({ classId, students, term, onTerm, canEnter, lead 
       {sid && (
         <>
           <button type="button" className="text-sm font-medium text-[#2B4BFF] hover:underline" onClick={() => setSid("")} data-testid="analysis-back">Back to whole class</button>
-          {rep ? <AcademicWheel report={rep} classAvg={classAvg} name={student ? student.first_name : ""} testid="academic-wheel" history={studentReports} studentId={sid} />
+          {rep ? <AcademicWheel report={rep} classAvg={classAvg} name={student ? student.first_name : ""} testid="academic-wheel" history={studentReports} studentId={sid} year={year} />
             : <div className="ui-card p-8 text-center text-slate-500" data-testid="analysis-none">
                 {student?.first_name} has no marks for {term}.
                 {studentReports.length > 0 && <> Marks exist for {studentReports.map((r) => (

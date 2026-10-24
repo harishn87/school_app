@@ -3,7 +3,8 @@
   - 12 classes: PP1, PP2, Class 1 ... Class 10, with 10 students each (120 students)
   - one parent login with two children (in Class 3 and Class 7)
   - six class teachers (Ravi Kumar: Class 3 and Class 4), a secondary teacher on some classes, and a class attender for each
-  - Term 1 fees (some paid, some part paid, some unpaid), Term 1 progress reports, this month's attendance, holidays
+  - Term 1 fees (some paid, some part paid, some unpaid), Term 1 and Term 2 progress reports, this month's attendance, holidays
+  - two earlier years (2024-25 and 2025-26) of progress reports for every term and of fee records, for history views
 
 Safe to run again: anything that already exists is skipped.
 Usage:  python seed_demo.py [--url http://localhost:8001] [--school demo]
@@ -179,6 +180,47 @@ def main():
                     "marks": [{"subject": sub, "score": rnd.randint(42, 98), "max_score": 100} for sub in subjects_for(idx)]} for s in kids]
         need(c.call("POST", "/reports/batch", {"class_id": cid, "term": "Term 1", "entries": entries}), f"save reports for {cname}")
     print("Term 1 progress reports saved for every class.")
+
+    # More test academics: Term 2 for this year, then two earlier years of reports and fees
+    def marks_for(idx, base, delta):
+        return [{"subject": sub, "score": max(20, min(99, base + delta + rnd.randint(-9, 9))), "max_score": 100} for sub in subjects_for(idx)]
+    ability = {s["id"]: rnd.randint(48, 88) for s in all_students}
+    def save_reports(idx, cname, term, year, delta):
+        cid = classes[cname]["id"]
+        path = f"/reports?class_id={cid}&term={term.replace(' ', '%20')}" + (f"&academic_year={year}" if year else "")
+        if need(c.call("GET", path), "check reports"):
+            return False
+        kids = [s for s in all_students if s.get("class_id") == cid]
+        entries = [{"student_id": s["id"], "remark": rnd.choice(remarks), "marks": marks_for(idx, ability[s["id"]], delta)} for s in kids]
+        body = {"class_id": cid, "term": term, "entries": entries}
+        if year:
+            body["academic_year"] = year
+        need(c.call("POST", "/reports/batch", body), f"save {term} {year or 'this year'} for {cname}")
+        return True
+    for idx, cname in enumerate(CLASSES):
+        save_reports(idx, cname, "Term 2", None, 2)
+    print("Term 2 reports saved for every class (this year).")
+    for year, delta in (("2024-25", -7), ("2025-26", -3)):
+        for idx, cname in enumerate(CLASSES):
+            for term in ("Term 1", "Term 2", "Term 3", "Annual"):
+                save_reports(idx, cname, term, year, delta + (1 if term in ("Term 3", "Annual") else 0))
+        print(f"{year}: reports saved for every class.")
+    have_fee = {(f["student_id"], f.get("academic_year")) for f in need(c.call("GET", "/fees?academic_year=all"), "list fees")}
+    fee_idx = {s["id"]: i for i, cname in enumerate(CLASSES) for s in all_students if s.get("class_id") == classes[cname]["id"]}
+    added = 0
+    for year, scale, due in (("2024-25", .8, ("2024-07-31", "2024-11-30", "2025-03-15")), ("2025-26", .9, ("2025-07-31", "2025-11-30", "2026-03-15"))):
+        for n, s in enumerate(all_students):
+            if (s["id"], year) in have_fee:
+                continue
+            for t, (term, d) in enumerate(zip(("Term 1", "Term 2", "Term 3"), due)):
+                amount = int(fee_for(fee_idx.get(s["id"], 0)) * scale)
+                paid = amount
+                if year == "2025-26" and t == 2 and n % 8 == 0:
+                    paid = [0, amount // 2][n % 16 == 0]      # a few families still owe last year's final term
+                need(c.call("POST", "/fees", {"student_id": s["id"], "term": term, "academic_year": year, "amount": amount, "paid_amount": paid,
+                                             "due_date": d, "paid_date": d if paid else None}), "add past fee")
+                added += 1
+    print(f"Past-year fee records added: {added}")
 
     # Parent login (one parent, two children)
     code, data = c.call("POST", "/users", {"name": "Lakshmi Reddy", "email": PARENT_EMAIL, "role": "parent", "password": PARENT_PASSWORD})
