@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, Pencil, Phone } from "lucide-react";
 import { api } from "@/lib/api";
@@ -28,7 +29,7 @@ function Split({ c }) {
   );
 }
 
-function ClassCard({ c, date, open, onToggle }) {
+function ClassCard({ c, date, open, onToggle, canMark }) {
   const flagged = c.students.filter((s) => s.status === "absent" || s.status === "late");
   return (
     <section className="ui-card p-5" data-testid={`day-class-${c.class_id}`}>
@@ -70,9 +71,9 @@ function ClassCard({ c, date, open, onToggle }) {
         <button type="button" onClick={onToggle} aria-expanded={open} className="inline-flex items-center gap-1 text-sm font-medium text-[#2B4BFF] hover:underline" data-testid={`day-toggle-${c.class_id}`}>
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" /> {open ? "Hide students" : "All students"}
         </button>
-        <Link to={`/app/attendance?date=${date}&class=${c.class_id}`} className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#2B4BFF]">
+        {canMark && <Link to={`/app/attendance?date=${date}&class=${c.class_id}`} className="inline-flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-[#2B4BFF]">
           <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Mark or edit
-        </Link>
+        </Link>}
       </div>
 
       {open && (
@@ -96,6 +97,7 @@ function ClassCard({ c, date, open, onToggle }) {
 }
 
 export default function DayAttendancePage() {
+  const { user } = useAuth();
   const { date } = useParams();
   const [params] = useSearchParams();
   const only = params.get("class") || "";
@@ -147,7 +149,7 @@ export default function DayAttendancePage() {
           </div>
           {classes.length === 0
             ? <div className="ui-card p-8 text-center text-slate-500">No classes to show.</div>
-            : <div className="grid lg:grid-cols-2 gap-5">{classes.map((c) => <ClassCard key={c.class_id} c={c} date={date} open={!!open[c.class_id]} onToggle={() => setOpen((o) => ({ ...o, [c.class_id]: !o[c.class_id] }))} />)}</div>}
+            : <div className="grid lg:grid-cols-2 gap-5">{classes.map((c) => <ClassCard key={c.class_id} c={c} canMark={user?.role === "teacher"} date={date} open={!!open[c.class_id]} onToggle={() => setOpen((o) => ({ ...o, [c.class_id]: !o[c.class_id] }))} />)}</div>}
         </>
       )}
     </div>

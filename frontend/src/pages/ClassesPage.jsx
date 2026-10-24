@@ -2,8 +2,9 @@ import PageHero from "@/components/PageHero";
 import Modal from "@/components/Modal";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Link } from "react-router-dom";
-import { Plus, Pencil, Trash2, Phone, UserRound } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import WagonWheel from "@/components/WagonWheel";
+import { Plus, Pencil, Trash2, Phone, UserRound, LayoutGrid, PieChart } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
@@ -15,7 +16,31 @@ const rank = (n = "") => {
 };
 const schoolOrder = (a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || (a.section || "").localeCompare(b.section || "");
 
+const initials = (n = "") => n.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+const badge = (c) => { const m = (c.name || "").match(/\d+/); const pre = /^(pp|nursery|lkg|ukg|kg)/i.test((c.name || "").trim()) ? (c.name.match(/^[A-Za-z]+/)?.[0] || "").toUpperCase().slice(0, 2) : ""; return `${pre}${m ? m[0] : (c.name || "?")[0]}${(c.section || "").slice(0, 1)}`.toUpperCase(); };
+
+/** A small progress ring with the value in the middle. */
+function MiniRing({ value, label, warn, testid }) {
+  const r = 22, c = 2 * Math.PI * r, v = value == null ? 0 : Math.max(0, Math.min(100, value));
+  const color = value == null ? "#D8DCEE" : warn ? "#D98E04" : "#2B4BFF";
+  return (
+    <div className="flex flex-col items-center gap-1" data-testid={testid}>
+      <div className="relative h-14 w-14">
+        <svg viewBox="0 0 56 56" className="h-14 w-14 -rotate-90" role="img" aria-label={`${label} ${value == null ? "no data" : value + "%"}`}>
+          <circle cx="28" cy="28" r={r} fill="none" stroke="#E8ECFF" strokeWidth="6" />
+          {value != null && <circle cx="28" cy="28" r={r} fill="none" stroke={color} strokeWidth="6" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} />}
+        </svg>
+        <span className="absolute inset-0 grid place-items-center text-[13px] font-semibold tabular-nums">{value == null ? "-" : `${value}%`}</span>
+      </div>
+      <span className="text-[11px] text-slate-500">{label}</span>
+    </div>
+  );
+}
+
 export default function ClassesPage() {
+  const navigate = useNavigate();
+  const [mode, setMode] = useState("cards");   // cards | wheel
+  const [wm, setWm] = useState("attendance");
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [classes, setClasses] = useState([]);
@@ -84,57 +109,112 @@ export default function ClassesPage() {
           </button>
         )} />
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      {classes.length > 0 && (() => {
+        const all = Object.values(stats);
+        const students = all.reduce((a, x) => a + (x.students || 0), 0);
+        const wavg = (k) => { const w = all.filter((x) => x[k] != null && x.students); const n = w.reduce((a, x) => a + x.students, 0); return n ? Math.round(w.reduce((a, x) => a + x[k] * x.students, 0) / n) : null; };
+        const noTeacher = classes.filter((c) => !c.teacher_id).length;
+        const tiles = [["Classes", classes.length, isAdmin && noTeacher ? `${noTeacher} without a class teacher` : "All have a class teacher"], ["Students", students, "Across all classes"],
+          ["Attendance", wavg("attendance_pct") == null ? "-" : `${wavg("attendance_pct")}%`, "Last 30 days"], ["Average grade", wavg("grade_avg") == null ? "-" : `${wavg("grade_avg")}%`, "From academics"]];
+        return (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="classes-summary">
+            {tiles.map(([l, v, n]) => (
+              <div key={l} className="ui-card p-5">
+                <div className="text-sm text-slate-500">{l}</div>
+                <div className="font-heading text-3xl font-semibold mt-1 tabular-nums">{v}</div>
+                <div className="text-xs text-slate-500 mt-1">{n}</div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
+
+      {classes.length > 2 && (
+        <div className="flex justify-end">
+          <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Classes view">
+            {[["cards", "Cards", LayoutGrid], ["wheel", "Wheel", PieChart]].map(([k, l, Icon]) => (
+              <button key={k} type="button" role="tab" aria-selected={mode === k} onClick={() => setMode(k)} data-testid={`classes-mode-${k}`}
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium ${mode === k ? "bg-white text-[#2B4BFF] shadow-sm" : "text-slate-600"}`}><Icon className="h-4 w-4" aria-hidden="true" />{l}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {mode === "wheel" && classes.length > 2 && (
+        <div className="ui-card p-5" data-testid="classes-wheel-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><h2 className="font-heading text-xl font-semibold">Every class on one wheel</h2><p className="text-xs text-slate-500 mt-0.5">Click a class to open it.</p></div>
+            <div className="flex gap-1.5">
+              {[["attendance", "Attendance"], ["grade", "Grades"], ...(isAdmin ? [["fees", "Fees collected"]] : [])].map(([k, l]) => (
+                <button key={k} type="button" onClick={() => setWm(k)} aria-pressed={wm === k}
+                  className={`pill px-3 py-1 text-xs font-medium ${wm === k ? "bg-[#2B4BFF] text-white" : "bg-[#F1F4FF] text-[#3A4160]"}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          <div className="max-w-2xl mx-auto">
+            <WagonWheel testid="classes-wheel" title={{ attendance: "Attendance", grade: "Grades", fees: "Fees collected" }[wm]}
+              items={classes.map((c) => { const st = stats[c.id] || {}; return { label: `${c.name} ${c.section || ""}`.trim(), id: c.id,
+                value: wm === "attendance" ? st.attendance_pct ?? null : wm === "grade" ? st.grade_avg ?? null : (st.fees_total ? Math.round((st.fees_paid / st.fees_total) * 100) : null) }; })}
+              onSelect={(it) => navigate(`/app/classes/${it.id}`)} hint="Click a class to open it." />
+          </div>
+        </div>
+      )}
+
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 ${mode === "wheel" ? "hidden" : ""}`}>
         {classes.length === 0 && (
           <div className="ui-card p-8 col-span-full text-center text-slate-600">
             No classes yet. {isAdmin && "Click \"New class\" to create one."}
           </div>
         )}
-        {classes.map((c) => (
-          <div key={c.id} className="ui-card hoverable p-5" data-testid={`class-card-${c.id}`}>
-            <div className="flex items-start justify-between">
-              <div>
-                <h3 className="font-heading text-xl font-semibold">
-                  <Link to={`/app/classes/${c.id}`} className="hover:text-[#2B4BFF] hover:underline underline-offset-4 decoration-2" data-testid={`open-class-${c.id}`} title="Open this class">{c.name}</Link>
-                </h3>
-                <div className="text-sm text-slate-600">Section {c.section || "—"}</div>
-                {isAdmin && !c.teacher_id && <div className="mt-1 text-sm text-amber-700" data-testid={`no-teacher-${c.id}`}>No class teacher assigned. Edit to assign one.</div>}
-                {c.academic_year && (
-                  <span className="inline-block mt-3 px-2 py-1 bg-[#E8ECFF] text-[#2B4BFF] rounded-full font-medium text-xs capitalize">
-                    {c.academic_year}
-                  </span>
+        {classes.map((c) => {
+          const st = stats[c.id] || { students: 0 };
+          const feePct = st.fees_total ? Math.round((st.fees_paid / st.fees_total) * 100) : null;
+          const tName = teacherName(c.teacher_id);
+          return (
+            <article key={c.id} className="ui-card hoverable group overflow-hidden flex flex-col relative cursor-pointer focus-within:ring-2 focus-within:ring-[#2B4BFF]" data-testid={`class-card-${c.id}`}>
+              <div className="surface-midnight ruled-light px-5 py-4 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 min-w-[3rem] px-2 shrink-0 grid place-items-center rounded-xl bg-gradient-to-br from-[#2B4BFF] to-[#1B2FB8] font-heading font-semibold text-lg shadow-lg shadow-[#2B4BFF]/30">{badge(c)}</div>
+                  <div className="min-w-0">
+                    <h3 className="font-heading text-xl font-semibold leading-tight truncate">
+                      <Link to={`/app/classes/${c.id}`} className="after:absolute after:inset-0 after:z-0 focus:outline-none" data-testid={`open-class-${c.id}`} aria-label={`Open ${c.name} section ${c.section || ""}`}>{c.name}</Link>
+                    </h3>
+                    <div className="text-sm text-white/70">Section {c.section || "-"}{c.academic_year ? ` · ${c.academic_year}` : ""}</div>
+                  </div>
+                </div>
+                {isAdmin && (
+                  <div className="absolute top-3 right-3 z-10 flex gap-1.5 opacity-70 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                    <button onClick={() => openEdit(c)} className="h-8 w-8 grid place-items-center rounded-lg bg-white/10 hover:bg-white/20" aria-label={`Edit ${c.name}`} data-testid={`edit-class-${c.id}`}><Pencil className="h-4 w-4" aria-hidden="true" /></button>
+                    <button onClick={() => remove(c)} className="h-8 w-8 grid place-items-center rounded-lg bg-white/10 hover:bg-rose-500/80" aria-label={`Delete ${c.name}`} data-testid={`delete-class-${c.id}`}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                  </div>
                 )}
               </div>
-              {isAdmin && (
-                <div className="flex gap-2">
-                  <button onClick={() => openEdit(c)} className="ui-btn !p-2 bg-white" data-testid={`edit-class-${c.id}`}>
-                    <Pencil className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                  <button onClick={() => remove(c)} className="ui-btn !p-2 bg-white" data-testid={`delete-class-${c.id}`}>
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
+
+              <div className="p-5 flex-1 flex flex-col gap-4">
+                <div className="flex items-end justify-between" data-testid={`class-stats-${c.id}`}>
+                  <div>
+                    <div className="font-heading text-3xl font-semibold tabular-nums leading-none">{st.students}</div>
+                    <div className="text-xs text-slate-500 mt-1">students</div>
+                  </div>
+                  <div className="flex gap-3">
+                    <MiniRing label="Attend." value={st.attendance_pct ?? null} warn={st.attendance_pct != null && st.attendance_pct < 75} testid={`ring-att-${c.id}`} />
+                    <MiniRing label="Grade" value={st.grade_avg ?? null} warn={st.grade_avg != null && st.grade_avg < 50} testid={`ring-grade-${c.id}`} />
+                    {isAdmin && <MiniRing label="Fees paid" value={feePct} warn={feePct != null && feePct < 50} testid={`ring-fee-${c.id}`} />}
+                  </div>
                 </div>
-              )}
-            </div>
-            <ul className="mt-3 space-y-1 text-sm text-slate-600" data-testid={`class-team-${c.id}`}>
-              {c.teacher_id && <li className="flex items-center gap-2"><UserRound className="h-3.5 w-3.5 text-[#2B4BFF]" aria-hidden="true" /><span className="text-slate-500">Class teacher</span> <b className="font-medium text-slate-800">{teacherName(c.teacher_id) || "Assigned"}</b></li>}
-              {c.secondary_teacher_id && <li className="flex items-center gap-2"><UserRound className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /><span className="text-slate-500">Second teacher</span> <b className="font-medium text-slate-800">{teacherName(c.secondary_teacher_id) || "Assigned"}</b></li>}
-              {c.attender_name && <li className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" /><span className="text-slate-500">Attender</span> <b className="font-medium text-slate-800">{c.attender_name}</b>{c.attender_phone && <a href={`tel:${c.attender_phone.replace(/\s/g, "")}`} className="text-[#2B4BFF] hover:underline">{c.attender_phone}</a>}</li>}
-            </ul>
-            {(() => {
-              const st = stats[c.id] || { students: 0 };
-              const cell = (label, v) => <div><dt className="text-xs text-slate-500">{label}</dt><dd className="font-medium tabular-nums">{v}</dd></div>;
-              return (
-                <dl className="mt-4 flex justify-between gap-2 border-t border-[#EEF0F6] pt-3 text-sm" data-testid={`class-stats-${c.id}`}>
-                  {cell("Students", st.students)}
-                  {cell("Attend.", st.attendance_pct == null ? "-" : `${st.attendance_pct}%`)}
-                  {cell("Grade", st.grade_avg == null ? "-" : `${st.grade_avg}%`)}
-                  {isAdmin && cell("Fees due", st.fees_pending > 0 ? formatMoney(st.fees_pending) : "Nil")}
-                </dl>
-              );
-            })()}
-          </div>
-        ))}
+                {isAdmin && <div className="text-xs text-slate-500">Fees due <b className="text-slate-800 tabular-nums">{st.fees_pending > 0 ? formatMoney(st.fees_pending) : "Nil"}</b></div>}
+
+                <ul className="space-y-2 text-sm border-t border-[#EEF0F6] pt-3 mt-auto" data-testid={`class-team-${c.id}`}>
+                  {c.teacher_id
+                    ? <li className="flex items-center gap-2.5"><span className="h-7 w-7 grid place-items-center rounded-full bg-[#E8ECFF] text-[#2B4BFF] text-[11px] font-semibold">{initials(tName)}</span><span><span className="block text-[11px] text-slate-500 leading-none">Class teacher</span><b className="font-medium text-slate-800">{tName || "Assigned"}</b></span></li>
+                    : isAdmin && <li className="rounded-lg bg-amber-50 text-amber-800 px-3 py-2 text-xs" data-testid={`no-teacher-${c.id}`}>No class teacher assigned. Edit to assign one.</li>}
+                  {c.secondary_teacher_id && <li className="flex items-center gap-2.5"><span className="h-7 w-7 grid place-items-center rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">{initials(teacherName(c.secondary_teacher_id))}</span><span><span className="block text-[11px] text-slate-500 leading-none">Second teacher</span><b className="font-medium text-slate-800">{teacherName(c.secondary_teacher_id) || "Assigned"}</b></span></li>}
+                  {c.attender_name && <li className="flex items-center gap-2.5"><span className="h-7 w-7 grid place-items-center rounded-full bg-slate-100 text-slate-500"><Phone className="h-3.5 w-3.5" aria-hidden="true" /></span><span><span className="block text-[11px] text-slate-500 leading-none">Attender</span><b className="font-medium text-slate-800">{c.attender_name}</b>{c.attender_phone && <a href={`tel:${c.attender_phone.replace(/\s/g, "")}`} className="relative z-10 ml-2 text-[#2B4BFF] hover:underline">{c.attender_phone}</a>}</span></li>}
+                </ul>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       {showForm && (

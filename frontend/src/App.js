@@ -21,6 +21,7 @@ import ManagementDashboard from "@/pages/ManagementDashboard";
 import ClassDetailPage from "@/pages/ClassDetailPage";
 import ProgressPage from "@/pages/ProgressPage";
 import DayAttendancePage from "@/pages/DayAttendancePage";
+import SubjectPage from "@/pages/SubjectPage";
 import TransportPage from "@/pages/TransportPage";
 import ParentHome from "@/pages/ParentHome";
 import PlatformLoginPage from "@/pages/platform/PlatformLoginPage";
@@ -69,7 +70,7 @@ export default function App() {
           <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
           <Route path="/app" element={<Protected><DashboardLayout /></Protected>}>
             <Route index element={<Home />} />
-            <Route path="diary" element={<DiaryPage />} />
+            <Route path="diary" element={<RoleOnly roles={["teacher", "parent"]}><DiaryPage /></RoleOnly>} />
             <Route path="students" element={<StudentsPage />} />
             <Route path="students/:id" element={<StudentDetailPage />} />
             <Route path="classes" element={<ClassesPage />} />
@@ -80,6 +81,7 @@ export default function App() {
             <Route path="transport" element={<RoleOnly roles={["admin"]}><TransportPage /></RoleOnly>} />
             <Route path="attendance/day/:date" element={<RoleOnly roles={["admin", "teacher"]}><DayAttendancePage /></RoleOnly>} />
             <Route path="progress" element={<ProgressPage />} />
+            <Route path="progress/subject/:sid/:subject" element={<SubjectPage />} />
             <Route path="management" element={<RoleOnly roles={["admin"]}><ManagementDashboard /></RoleOnly>} />
             <Route path="holidays" element={<RoleOnly roles={["admin", "teacher"]}><HolidaysPage /></RoleOnly>} />
             <Route path="letters" element={<RoleOnly roles={["admin"]}><LettersPage /></RoleOnly>} />

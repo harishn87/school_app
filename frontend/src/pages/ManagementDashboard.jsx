@@ -1,18 +1,18 @@
 import PageHero from "@/components/PageHero";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
 import WagonWheel from "@/components/WagonWheel";
-import PivotTable from "@/components/PivotTable";
 
 const rank = (n = "") => { const m = n.match(/\d+/); return (/^(pp|nursery|lkg|ukg|kg)/i.test(n.trim()) ? 0 : 100) + (m ? Number(m[0]) : 0); };
 const avg = (v) => { const x = v.filter((n) => n != null); return x.length ? Math.round(x.reduce((a, b) => a + b, 0) / x.length) : null; };
 const monthLabel = (m) => new Date(`${m}-01T00:00:00`).toLocaleString("en-IN", { month: "short" });
 const BLUE = "#2B4BFF", GREEN = "#0E8F6E";
 
-function Card({ title, sub, children, testid }) {
+function Card({ title, sub, children, testid, innerRef }) {
   return (
-    <section className="ui-card p-5" data-testid={testid}>
+    <section className="ui-card p-5" data-testid={testid} ref={innerRef}>
       <h2 className="font-display text-lg font-semibold text-[#0B1020]">{title}</h2>
       {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
       <div className="mt-4">{children}</div>
@@ -88,6 +88,8 @@ export default function ManagementDashboard() {
   const [err, setErr] = useState("");
   const [metric, setMetric] = useState("attendance");
   const [subjClass, setSubjClass] = useState("");
+  const navigate = useNavigate();
+  const classWheelRef = useRef(null);
 
   useEffect(() => { api.get("/dashboard/school").then((r) => setD(r.data)).catch((e) => setErr(errorMessage(e))); }, []);
 
@@ -97,10 +99,11 @@ export default function ManagementDashboard() {
     return classes.map((c) => {
       const s = d.students.filter((x) => x.class_id === c.id);
       let value = null;
-      if (metric === "attendance") value = avg(s.map((x) => x.attendance_pct));
+      if (metric.startsWith("subject:")) value = d.subjects_by_class[c.id]?.[metric.slice(8)] ?? null;
+      else if (metric === "attendance") value = avg(s.map((x) => x.attendance_pct));
       else if (metric === "grade") value = avg(s.map((x) => x.grade_avg));
       else { const b = s.reduce((a, x) => a + x.fees_total, 0); value = b ? Math.round((s.reduce((a, x) => a + x.fees_paid, 0) / b) * 100) : null; }
-      return { label: c.name, value };
+      return { label: c.name, value, id: c.id };
     });
   }, [d, classes, metric]);
   const subjWheel = useMemo(() => {
@@ -116,7 +119,8 @@ export default function ManagementDashboard() {
   const t = d.today, marked = t.present + t.late + t.absent;
   const billed = d.students.reduce((a, s) => a + s.fees_total, 0), paid = d.students.reduce((a, s) => a + s.fees_paid, 0);
   const grade = avg(d.students.map((s) => s.grade_avg));
-  const metricInfo = { attendance: ["Attendance, last 30 days", "Share of marked days present, averaged over each class's students."], grade: ["Average grade", "Average of progress report marks."], fees: ["Fee collection", "Fees collected as a share of fees billed."] }[metric];
+  const subjMetric = metric.startsWith("subject:") ? metric.slice(8) : null;
+  const metricInfo = subjMetric ? [`${subjMetric} marks`, `Average ${subjMetric} mark in each class. Click a class to open it.`] : { attendance: ["Attendance, last 30 days", "Share of marked days present, averaged over each class's students."], grade: ["Average grade", "Average of progress report marks."], fees: ["Fee collection", "Fees collected as a share of fees billed."] }[metric];
 
   return (
     <div className="space-y-6" data-testid="management-dashboard">
@@ -130,27 +134,31 @@ export default function ManagementDashboard() {
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Class wheel" sub={metricInfo[1]} testid="wheel-classes">
+        <Card title="Class wheel" sub={metricInfo[1]} testid="wheel-classes" innerRef={classWheelRef}>
           <div className="flex flex-wrap gap-2 mb-2" role="group" aria-label="Wheel metric">
-            {[["attendance", "Attendance"], ["grade", "Grades"], ["fees", "Fee collection"]].map(([k, l]) => (
+            {[["attendance", "Attendance"], ["grade", "Grades"], ["fees", "Fee collection"], ...(subjMetric ? [[metric, subjMetric]] : [])].map(([k, l]) => (
               <button key={k} type="button" onClick={() => setMetric(k)} aria-pressed={metric === k} data-testid={`metric-${k}`}
                 className={`pill ${metric === k ? "bg-[#2B4BFF] text-white" : "bg-[#F1F4FF] text-[#3A4160]"} px-3 py-1 text-xs font-medium rounded-full`}>{l}</button>
             ))}
           </div>
-          <WagonWheel items={wheel} title={metricInfo[0]} zoom testid="wheel-class-chart" />
+          <WagonWheel items={wheel} title={metricInfo[0]} testid="wheel-class-chart" onSelect={(it) => navigate(`/app/classes/${it.id}`)} hint="Click a class to open it." />
         </Card>
         <Card title="Subject wheel" sub="Average marks per subject." testid="wheel-subjects">
           <label className="block max-w-[220px] mb-2"><span className="field-label">Class</span>
             <select className="ui-input mt-1" value={subjClass} onChange={(e) => setSubjClass(e.target.value)} data-testid="subject-class">
               <option value="">Whole school</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select></label>
-          <WagonWheel items={subjWheel} title="Subject averages" zoom testid="wheel-subject-chart" />
+          <WagonWheel items={subjWheel} title="Subject averages" testid="wheel-subject-chart" activeLabel={subjMetric}
+            onSelect={(it) => {
+              if (subjClass) navigate(`/app/progress?class=${subjClass}`);
+              else { setMetric(`subject:${it.label}`); classWheelRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }); }
+            }}
+            hint={subjClass ? "Click a subject to open this class's progress analysis." : "Click a subject to see it class by class."} />
         </Card>
         <Card title="Attendance by month" sub="Share of marked student days present." testid="trend"><TrendChart data={d.monthly_attendance} /></Card>
         <Card title="Fees by term" sub="Billed against collected." testid="fees-terms"><FeeBars data={d.fees_by_term} /></Card>
       </div>
 
-      <Card title="Pivot table" sub="Choose what goes down the side and across the top, then what to measure." testid="pivot-card"><PivotTable students={d.students} /></Card>
     </div>
   );
 }

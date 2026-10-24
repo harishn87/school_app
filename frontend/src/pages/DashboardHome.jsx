@@ -76,7 +76,7 @@ export default function DashboardHome() {
                 </p>
                 <div className="mt-6 flex flex-wrap gap-3">
                   <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">Mark attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
-                  <Link to="/app/progress" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">Update progress reports</Link>
+                  <Link to="/app/progress" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">Update academics</Link>
                 </div>
               </>
             ) : (
@@ -88,7 +88,7 @@ export default function DashboardHome() {
                   <span className="text-[#E9C46A]">{formatMoney(pending)} in fees is still to collect.</span>
                 </p>
                 <div className="mt-7 flex flex-wrap gap-3">
-                  <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">Mark attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
+                  <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">View attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
                   <Link to="/app/fees" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">View fees</Link>
                   {user?.role === "admin" && <Link to="/app/management" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">School dashboard</Link>}
                 </div>
@@ -142,7 +142,7 @@ export default function DashboardHome() {
           <h3 className="font-heading text-lg font-semibold">Set up your school in four steps</h3>
           <p className="text-sm text-slate-500 mt-1">Most schools are up and running in under ten minutes.</p>
           <ol className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
-            {[["Create classes", "/app/classes"], ["Add students", "/app/students"], ["Invite staff and parents", "/app/users"], ["Mark attendance", "/app/attendance"]].map(([s, to], i) => (
+            {[["Create classes", "/app/classes"], ["Add students", "/app/students"], ["Invite staff and parents", "/app/users"], ["View attendance", "/app/attendance"]].map(([s, to], i) => (
               <li key={s}>
                 <Link to={to} className="flex items-center gap-3 rounded-xl border border-[#E7E9F1] p-3.5 hover:border-[#2B4BFF]/40 hover:bg-[#F1F4FF] transition-colors">
                   <span className="h-7 w-7 grid place-items-center rounded-full bg-[#E8ECFF] text-[#2B4BFF] font-semibold text-xs">{i + 1}</span>

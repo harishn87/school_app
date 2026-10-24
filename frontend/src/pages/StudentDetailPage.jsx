@@ -100,7 +100,7 @@ export default function StudentDetailPage() {
       <div className="ui-card p-6" data-testid="academics">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="font-heading text-2xl font-semibold">Academics</h2>
-          {canEdit && student.class_id && <Link to={`/app/progress?class=${student.class_id}`} className="ui-btn text-sm" data-testid="update-progress-link">Update progress report</Link>}
+          {canEdit && student.class_id && <Link to={`/app/progress?class=${student.class_id}`} className="ui-btn text-sm" data-testid="update-progress-link">{user?.role === "teacher" ? "Update progress report" : "View analysis"}</Link>}
         </div>
         {reports.length > 0 && (
           <div className="mt-4 grid lg:grid-cols-2 gap-4" data-testid="academics-reports">

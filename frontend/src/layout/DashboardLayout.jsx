@@ -8,10 +8,10 @@ import {
 const ALL_NAV = [
   { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, testid: "nav-overview", group: "Today" },
   { to: "/app/management", label: "Dashboard", icon: PieChart, testid: "nav-management", group: "Today", roles: ["admin"] },
-  { to: "/app/diary", label: "Class diary", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary", group: "Today" },
+  { to: "/app/diary", label: "Class diary", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary", group: "Today", roles: ["teacher", "parent"] },
   { to: "/app/students", label: "Students", parentLabel: "My children", icon: GraduationCap, testid: "nav-students", group: "School" },
   { to: "/app/classes", label: "Classes", icon: Users, testid: "nav-classes", group: "School", roles: ["admin", "teacher"] },
-  { to: "/app/progress", label: "Progress reports", parentLabel: "Progress", icon: ClipboardList, testid: "nav-progress", group: "School" },
+  { to: "/app/progress", label: "Academics", parentLabel: "Academics", icon: ClipboardList, testid: "nav-progress", group: "School" },
   { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", group: "Office", roles: ["admin", "parent"] },
   { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance", group: "Today" },
   { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", group: "Today", roles: ["admin", "teacher"] },
@@ -59,7 +59,9 @@ export default function DashboardLayout() {
     .map((n) => ({ ...n, label: parent && n.parentLabel ? n.parentLabel : n.label }));
   const mobileOrder = parent
     ? ["/app", "/app/progress", "/app/diary", "/app/fees", "/app/attendance"]
-    : ["/app", "/app/diary", "/app/students", "/app/attendance", user?.role === "teacher" ? "/app/progress" : "/app/fees"];
+    : user?.role === "teacher"
+      ? ["/app", "/app/diary", "/app/students", "/app/attendance", "/app/progress"]
+      : ["/app", "/app/students", "/app/classes", "/app/attendance", "/app/fees"];
   const mobileNav = mobileOrder.map((to) => nav.find((n) => n.to === to)).filter(Boolean);
   const sections = parent ? [{ title: null, items: nav }] : ["Today", "School", "Office"].map((g) => ({ title: g, items: nav.filter((n) => n.group === g) })).filter((x) => x.items.length);
   const signOut = async () => { await logout(); navigate("/login"); };

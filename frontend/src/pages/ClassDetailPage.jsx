@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CalendarCheck, GraduationCap, Phone, TrendingUp, UserRound, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import { formatDate, formatMoney } from "@/lib/utils";
 import SchoolMonthCalendar from "@/components/SchoolMonthCalendar";
 import PostCard from "@/components/PostCard";
@@ -30,6 +31,8 @@ export default function ClassDetailPage() {
   const [cls, setCls] = useState(null);
   const [staff, setStaff] = useState([]);
   const [ov, setOv] = useState(null);
+  const { user } = useAuth();
+  const teacherView = user?.role === "teacher";
   const [posts, setPosts] = useState([]);
   const [day, setDay] = useState(new Date().toLocaleDateString("en-CA"));
   const [dayMarks, setDayMarks] = useState([]);
@@ -96,7 +99,7 @@ export default function ClassDetailPage() {
       <section className="ui-card overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEF0F6] flex items-center justify-between">
           <h2 className="font-heading text-lg font-semibold">Students</h2>
-          <Link to="/app/diary" className="text-sm font-medium text-[#2B4BFF] hover:underline">Post to class diary</Link>
+          {teacherView && <Link to="/app/diary" className="text-sm font-medium text-[#2B4BFF] hover:underline">Post to class diary</Link>}
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="cd-table">
@@ -131,7 +134,7 @@ export default function ClassDetailPage() {
           <SchoolMonthCalendar classId={id} selected={day} onPick={setDay} refreshKey={0} />
           <div className="ui-card p-4 text-sm" data-testid="cd-day">
             <div className="font-medium">{formatDate(day)}</div>
-            {marked === 0 ? <p className="text-slate-500 mt-1">No attendance marked for this day. <Link className="text-[#2B4BFF]" to="/app/attendance">Mark attendance</Link></p> : (
+            {marked === 0 ? <p className="text-slate-500 mt-1">No attendance marked for this day.{teacherView && <> <Link className="text-[#2B4BFF]" to="/app/attendance">Mark attendance</Link></>}</p> : (
               <div className="mt-1 space-y-1.5">
                 <p className="text-slate-600">{present} present · {late.length} late · {absent.length} absent</p>
                 {absent.length > 0 && <p><b className="text-rose-700">Absent:</b> {absent.map((m) => byId[m.student_id].name).join(", ")}</p>}
@@ -140,11 +143,11 @@ export default function ClassDetailPage() {
             )}
           </div>
         </div>
-        <section>
+        {teacherView && <section>
           <h2 className="font-heading text-lg font-semibold mb-3">Recent class diary</h2>
           {posts.length === 0 ? <div className="ui-card p-6 text-sm text-slate-500">No posts for this class yet.</div>
             : <div className="space-y-3">{posts.map((p) => <PostCard key={p.id} post={p} />)}</div>}
-        </section>
+        </section>}
       </div>
     </div>
   );

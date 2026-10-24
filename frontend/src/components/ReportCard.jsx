@@ -4,7 +4,7 @@ import { formatDate } from "@/lib/utils";
 export default function ReportCard({ report, compact = false }) {
   const marks = report.marks || [];
   return (
-    <article className="rounded-xl border border-[#E7E9F1] bg-white p-4 sm:p-5" data-testid={`report-${report.term}`}>
+    <article className="rounded-xl border border-[#E7E9F1] bg-white p-4 sm:p-5" data-testid={`report-${report.term}`} id={`rc-${report.student_id}-${report.term.replace(/\s/g, "")}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="font-heading font-semibold text-lg">{report.term}</h3>
