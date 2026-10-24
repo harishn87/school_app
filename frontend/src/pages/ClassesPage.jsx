@@ -1,9 +1,18 @@
 import Modal from "@/components/Modal";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, Pencil, Trash2, ArrowUpRight } from "lucide-react";
+import { formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+
+// PP1, PP2, then Class 1 ... Class 10 in school order (plain alphabetical would put Class 10 before Class 2)
+const rank = (n = "") => {
+  const m = n.match(/\d+/); const num = m ? Number(m[0]) : 0;
+  return (/^(pp|nursery|lkg|ukg|kg)/i.test(n.trim()) ? 0 : 100) + num;
+};
+const schoolOrder = (a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name) || (a.section || "").localeCompare(b.section || "");
 
 export default function ClassesPage() {
   const { user } = useAuth();
@@ -13,10 +22,12 @@ export default function ClassesPage() {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", section: "", academic_year: "", teacher_id: "" });
   const [teachers, setTeachers] = useState([]);
+  const [stats, setStats] = useState({});
 
   const load = async () => {
     const { data } = await api.get("/classes");
-    setClasses(data);
+    setClasses([...data].sort(schoolOrder));
+    api.get("/dashboard/overview").then((r) => setStats(Object.fromEntries(r.data.classes.filter((c) => c.class_id).map((c) => [c.class_id, c])))).catch(() => {});
   };
   useEffect(() => { load(); }, []);
   useEffect(() => {
@@ -104,6 +115,21 @@ export default function ClassesPage() {
                 </div>
               )}
             </div>
+            {(() => {
+              const st = stats[c.id] || { students: 0 };
+              const cell = (label, v) => <div><dt className="text-xs text-slate-500">{label}</dt><dd className="font-medium tabular-nums">{v}</dd></div>;
+              return (
+                <dl className="mt-4 flex justify-between gap-2 border-t border-[#EEF0F6] pt-3 text-sm" data-testid={`class-stats-${c.id}`}>
+                  {cell("Students", st.students)}
+                  {cell("Attend.", st.attendance_pct == null ? "-" : `${st.attendance_pct}%`)}
+                  {cell("Grade", st.grade_avg == null ? "-" : `${st.grade_avg}%`)}
+                  {cell("Fees due", st.fees_pending > 0 ? formatMoney(st.fees_pending) : "Nil")}
+                </dl>
+              );
+            })()}
+            <Link to={`/app/classes/${c.id}`} className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-[#2B4BFF] hover:underline" data-testid={`open-class-${c.id}`}>
+              Open class <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
           </div>
         ))}
       </div>

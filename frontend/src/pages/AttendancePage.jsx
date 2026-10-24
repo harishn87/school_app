@@ -3,6 +3,8 @@ import { api, errorMessage } from "@/lib/api";
 import { toast } from "sonner";
 import { Save, CalendarCheck, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import SchoolMonthCalendar from "@/components/SchoolMonthCalendar";
+import MonthCalendar from "@/components/MonthCalendar";
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -14,6 +16,8 @@ export default function AttendancePage() {
   const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState({}); // {student_id: status}
   const [saving, setSaving] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [kid, setKid] = useState("");
 
   const loadCore = async () => {
     const [{ data: c }, { data: s }] = await Promise.all([api.get("/classes"), api.get("/students", { params: { status: "active" } })]);
@@ -60,6 +64,7 @@ export default function AttendancePage() {
     try {
       await api.post("/attendance/batch", payload);
       toast.success(`Saved attendance for ${payload.marks.length} students`);
+      setRefresh((n) => n + 1);
     } catch (e) { toast.error(errorMessage(e)); }
     finally { setSaving(false); }
   };
@@ -75,6 +80,22 @@ export default function AttendancePage() {
     }
     return out;
   }, [filtered, marks]);
+
+  if (!canMark) {
+    const mine = filtered;
+    const cur = kid || mine[0]?.id || "";
+    return (
+      <div className="max-w-xl mx-auto space-y-5 animate-fade-up" data-testid="attendance-page">
+        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Attendance</h1>
+        {mine.length > 1 && (
+          <select className="ui-input" value={cur} onChange={(e) => setKid(e.target.value)} aria-label="Child" data-testid="attendance-child">
+            {mine.map((s) => <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>)}
+          </select>
+        )}
+        {cur ? <MonthCalendar key={cur} studentId={cur} /> : <div className="ui-card p-8 text-center text-slate-500">No students are linked to your account yet.</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="attendance-page">
@@ -103,6 +124,8 @@ export default function AttendancePage() {
           </>
         )}
       </div>
+
+      <SchoolMonthCalendar classId={classId} selected={date} onPick={setDate} refreshKey={refresh} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Mini label="Present" value={stats.present} color="bg-[#E6F8EE]" />

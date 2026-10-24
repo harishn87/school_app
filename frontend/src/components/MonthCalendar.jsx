@@ -4,9 +4,9 @@ import { api } from "@/lib/api";
 
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const LOOK = {
-  present: { code: "P", label: "Present", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  late: { code: "L", label: "Late", cls: "bg-amber-50 text-amber-700 border-amber-200" },
-  absent: { code: "A", label: "Absent", cls: "bg-rose-50 text-rose-700 border-rose-200" },
+  present: { code: "P", label: "Present", cls: "bg-emerald-500 text-white border-emerald-500" },
+  late: { code: "L", label: "Late", cls: "bg-amber-400 text-amber-950 border-amber-400" },
+  absent: { code: "A", label: "Absent", cls: "bg-rose-500 text-white border-rose-500" },
 };
 
 const ym = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -50,15 +50,15 @@ export default function MonthCalendar({ studentId }) {
         {Array.from({ length: lead }).map((_, i) => <div key={`b${i}`} />)}
         {(data?.days || Array.from({ length: 30 }).map(() => null)).map((d, i) => {
           if (!d) return <div key={i} className="aspect-square rounded-lg bg-slate-50 animate-pulse" />;
-          const st = LOOK[d.status];
+          const st = d.holiday ? null : LOOK[d.status];
           const day = Number(d.date.slice(8));
-          const tone = st ? st.cls : d.holiday ? "bg-[#E8ECFF] text-[#2340F0] border-[#C9D2FF]" : d.weekend ? "bg-slate-50 text-slate-400 border-transparent" : "bg-white text-slate-600 border-[#EEF0F6]";
+          const tone = st ? st.cls : d.holiday ? "bg-[#0B1020] text-white border-[#0B1020]" : d.weekend ? "bg-slate-50 text-slate-400 border-transparent" : "bg-white text-slate-600 border-[#EEF0F6]";
           return (
             <div key={d.date} data-testid={`day-${d.date}`} data-status={d.status || (d.holiday ? "holiday" : "")}
               title={d.holiday ? `${d.holiday} (holiday)` : st ? st.label : d.weekend ? "Sunday" : "Not marked"}
               className={`aspect-square rounded-lg border flex flex-col items-center justify-center text-sm leading-none ${tone} ${d.date === todayIso ? "ring-2 ring-[#2B4BFF] ring-offset-1" : ""}`}>
               <span className="font-medium">{day}</span>
-              <span className="mt-1 text-[10px] font-semibold h-3">{st ? st.code : d.holiday ? "H" : ""}</span>
+              <span className="mt-1 text-[10px] font-bold h-3">{st ? st.code : d.holiday ? "H" : ""}</span>
             </div>
           );
         })}
@@ -67,10 +67,10 @@ export default function MonthCalendar({ studentId }) {
       {error && <p className="mt-3 text-sm text-red-600">Couldn&apos;t load the calendar. Please try again.</p>}
 
       <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600" data-testid="cal-counts">
-        <span><b className="text-emerald-700">P</b> Present {c ? c.present : "-"}</span>
-        <span><b className="text-amber-700">L</b> Late {c ? c.late : "-"}</span>
-        <span><b className="text-rose-700">A</b> Absent {c ? c.absent : "-"}</span>
-        <span><b className="text-[#2340F0]">H</b> Holiday {c ? c.holiday : "-"}</span>
+        <span><i className="inline-block h-3 w-3 rounded bg-emerald-500 align-[-1px] mr-1" />Present {c ? c.present : "-"}</span>
+        <span><i className="inline-block h-3 w-3 rounded bg-amber-400 align-[-1px] mr-1" />Late {c ? c.late : "-"}</span>
+        <span><i className="inline-block h-3 w-3 rounded bg-rose-500 align-[-1px] mr-1" />Absent {c ? c.absent : "-"}</span>
+        <span><i className="inline-block h-3 w-3 rounded bg-[#0B1020] align-[-1px] mr-1" />Holiday {c ? c.holiday : "-"}</span>
         {data?.percent != null && <span className="ml-auto font-medium text-slate-800">{data.percent}% attendance this month</span>}
       </div>
 

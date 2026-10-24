@@ -17,6 +17,7 @@ import AccountPage from "@/pages/AccountPage";
 import DiaryPage from "@/pages/DiaryPage";
 import LettersPage from "@/pages/LettersPage";
 import HolidaysPage from "@/pages/HolidaysPage";
+import ClassDetailPage from "@/pages/ClassDetailPage";
 import TransportPage from "@/pages/TransportPage";
 import ParentHome from "@/pages/ParentHome";
 import PlatformLoginPage from "@/pages/platform/PlatformLoginPage";
@@ -69,6 +70,7 @@ export default function App() {
             <Route path="students" element={<StudentsPage />} />
             <Route path="students/:id" element={<StudentDetailPage />} />
             <Route path="classes" element={<ClassesPage />} />
+            <Route path="classes/:id" element={<RoleOnly roles={["admin", "teacher"]}><ClassDetailPage /></RoleOnly>} />
             <Route path="fees" element={<FeesPage />} />
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="users" element={<RoleOnly roles={["admin"]}><UsersPage /></RoleOnly>} />

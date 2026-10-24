@@ -59,3 +59,15 @@ def test_dashboard_overview(server, new_client):
     assert x["mom"].get("/api/dashboard/overview").status_code == 403
     # teacher with no classes sees none
     assert x["teacher"].get("/api/dashboard/overview").json()["totals"]["students"] == 0
+
+
+def test_attendance_month(server, new_client):
+    x = _setup(server, new_client)
+    server.post("/api/holidays", json={"name": "Gandhi Jayanti", "date": "2026-10-02"})
+    server.post("/api/attendance/batch", json={"date": "2026-10-05", "marks": [
+        {"student_id": x["kid"]["id"], "status": "present"}, {"student_id": x["kid2"]["id"], "status": "absent"}]})
+    r = server.get("/api/attendance/month?month=2026-10").json()
+    d = {i["date"]: i for i in r["days"]}
+    assert r["students"] == 2 and d["2026-10-05"]["present"] == 1 and d["2026-10-05"]["absent"] == 1 and d["2026-10-05"]["marked"] == 2
+    assert d["2026-10-02"]["holiday"] == "Gandhi Jayanti" and d["2026-10-04"]["weekend"] is True
+    assert x["mom"].get("/api/attendance/month?month=2026-10").status_code == 403

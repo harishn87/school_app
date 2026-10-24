@@ -1,0 +1,171 @@
+"""Fill a demo school with sample data through the running app's own API.
+
+  - 12 classes: PP1, PP2, Class 1 ... Class 10, with 10 students each (120 students)
+  - one parent login with two children (in Class 3 and Class 7)
+  - Term 1 fees (some paid, some part paid, some unpaid), grades, this month's attendance, holidays
+
+Safe to run again: anything that already exists is skipped.
+Usage:  python seed_demo.py [--url http://localhost:8001] [--school demo]
+                            [--admin admin@school.com] [--password admin123]
+Uses only the Python standard library.
+"""
+import argparse
+import json
+import random
+import sys
+import urllib.error
+import urllib.request
+from datetime import date, timedelta
+from http.cookiejar import CookieJar
+
+ap = argparse.ArgumentParser()
+ap.add_argument("--url", default="http://localhost:8001")
+ap.add_argument("--school", default="demo")
+ap.add_argument("--admin", default="admin@school.com")
+ap.add_argument("--password", default="admin123")
+ap.add_argument("--owner", default="owner@example.com")
+ap.add_argument("--owner-password", default="OwnerPass#2026")
+A = ap.parse_args()
+
+PARENT_EMAIL, PARENT_PASSWORD = "parent@demo.example.com", "Parent#2026"
+
+
+class Client:
+    def __init__(self):
+        self.op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(CookieJar()))
+
+    def call(self, method, path, body=None, ok=(200, 201)):
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(A.url + "/api" + path, data=data, method=method, headers={"Content-Type": "application/json"})
+        try:
+            with self.op.open(req, timeout=60) as r:
+                raw = r.read()
+                return r.status, (json.loads(raw) if raw else None)
+        except urllib.error.HTTPError as e:
+            raw = e.read()
+            try:
+                return e.code, json.loads(raw)
+            except Exception:
+                return e.code, {"detail": raw.decode(errors="replace")}
+
+
+def need(res, what):
+    code, data = res
+    if code not in (200, 201):
+        sys.exit(f"Could not {what}: HTTP {code} {data.get('detail') if isinstance(data, dict) else data}")
+    return data
+
+
+CLASSES = ["PP1", "PP2"] + [f"Class {i}" for i in range(1, 11)]
+BOYS = ["Aarav", "Vihaan", "Arjun", "Reyansh", "Sai", "Krishna", "Ishaan", "Rohan", "Karthik", "Aditya", "Dhruv", "Kabir", "Nikhil", "Pranav", "Rahul", "Siddharth", "Varun", "Yash", "Harsha", "Teja"]
+GIRLS = ["Ananya", "Diya", "Saanvi", "Aadhya", "Myra", "Kavya", "Meera", "Nisha", "Priya", "Riya", "Sneha", "Tanvi", "Vaishnavi", "Navya", "Ishita", "Lakshmi", "Pooja", "Sara", "Zoya", "Charvi"]
+SURNAMES = ["Sharma", "Reddy", "Patel", "Iyer", "Naidu", "Rao", "Gupta", "Singh", "Mehta", "Nair", "Verma", "Kumar", "Chowdary", "Khan", "Joshi", "Menon", "Das", "Pillai", "Goud", "Shah"]
+
+
+def fee_for(idx):
+    return 15000 if idx < 2 else 20000 if idx < 7 else 25000 if idx < 10 else 30000
+
+
+def subjects_for(idx):
+    return ["English", "Numbers", "Drawing"] if idx < 2 else ["Maths", "English", "Science", "Social"]
+
+
+def main():
+    c = Client()
+    # 1. A trial plan allows 100 students; this data needs 120, so move the demo school to Pro when the owner login works.
+    owner = Client()
+    if owner.call("POST", "/platform/auth/login", {"email": A.owner, "password": A.owner_password})[0] == 200:
+        schools = owner.call("GET", "/platform/schools")[1] or []
+        mine = next((s for s in schools if s.get("slug") == A.school or s.get("code") == A.school), None)
+        if mine and mine.get("plan") == "trial":
+            owner.call("PATCH", f"/platform/schools/{mine['id']}", {"plan": "pro"})
+            print("Moved the demo school to the Pro plan (trial allows only 100 students).")
+    else:
+        print("Owner login did not work; if the student limit is hit, upgrade the plan from the owner console.")
+
+    need(c.call("POST", "/auth/login", {"school_code": A.school, "email": A.admin, "password": A.password}), "log in as school admin")
+
+    classes = {x["name"]: x for x in need(c.call("GET", "/classes"), "list classes")}
+    for name in CLASSES:
+        if name not in classes:
+            classes[name] = need(c.call("POST", "/classes", {"name": name, "section": "A", "academic_year": "2026-27"}), f"create {name}")
+    print(f"Classes ready: {len(classes)}")
+
+    existing = need(c.call("GET", "/students"), "list students")
+    have = {(s["first_name"], s["last_name"]) for s in existing}
+    per_class = {}
+    for s in existing:
+        per_class.setdefault(s.get("class_id"), []).append(s)
+
+    rnd = random.Random(2026)
+    used = set(have)
+    created = 0
+    for idx, cname in enumerate(CLASSES):
+        cid = classes[cname]["id"]
+        mine = per_class.get(cid, [])
+        for j in range(len(mine), 10):
+            roll = j + 1
+            if cname == "Class 3" and j == 0:
+                first, last, gender, guardian = "Aarav", "Reddy", "male", PARENT_EMAIL
+            elif cname == "Class 7" and j == 0:
+                first, last, gender, guardian = "Ananya", "Reddy", "female", PARENT_EMAIL
+            else:
+                gender = "male" if j % 2 == 0 else "female"
+                pool = BOYS if gender == "male" else GIRLS
+                while True:
+                    first, last = rnd.choice(pool), rnd.choice(SURNAMES)
+                    if (first, last) not in used:
+                        break
+                guardian = None
+            used.add((first, last))
+            age = 3 + idx + (1 if idx else 0)
+            body = {
+                "first_name": first, "last_name": last, "gender": gender,
+                "date_of_birth": f"{2026 - age}-{rnd.randint(1, 12):02d}-{rnd.randint(1, 28):02d}",
+                "joining_date": "2026-06-10", "class_id": cid, "roll_number": str(roll),
+                "guardian_name": f"{'Mr' if rnd.random() < .5 else 'Mrs'} {last}", "guardian_phone": f"98{rnd.randint(10000000, 99999999)}",
+                "guardian_email": guardian, "address": "Hyderabad",
+                "grades": [{"subject": sub, "term": "Term 1", "score": rnd.randint(42, 98), "max_score": 100} for sub in subjects_for(idx)],
+            }
+            s = need(c.call("POST", "/students", body), f"add {first} {last}")
+            amount = fee_for(idx)
+            paid = [amount, amount // 2, 0, amount][roll % 4]
+            need(c.call("POST", "/fees", {"student_id": s["id"], "term": "Term 1", "amount": amount, "paid_amount": paid,
+                                         "due_date": "2026-07-31", "paid_date": "2026-07-20" if paid else None}), "add fee")
+            created += 1
+        print(f"  {cname}: {max(0, 10 - len(mine))} added")
+    print(f"Students added: {created}")
+
+    # Parent login (one parent, two children)
+    code, data = c.call("POST", "/users", {"name": "Lakshmi Reddy", "email": PARENT_EMAIL, "role": "parent", "password": PARENT_PASSWORD})
+    print("Parent login created." if code == 201 else "Parent login already exists." if code == 409 else f"Parent login: HTTP {code} {data}")
+
+    # Holidays
+    have_h = {h["name"] for h in need(c.call("GET", "/holidays"), "list holidays")}
+    for name, d, e in [("Gandhi Jayanti", "2026-10-02", None), ("Dussehra", "2026-10-20", "2026-10-21"), ("Diwali break", "2026-11-08", "2026-11-10"), ("Christmas", "2026-12-25", None)]:
+        if name not in have_h:
+            need(c.call("POST", "/holidays", {"name": name, "date": d, "end_date": e}), f"add holiday {name}")
+    off = set()
+    for h in need(c.call("GET", "/holidays"), "list holidays"):
+        d0 = date.fromisoformat(h["date"]); d1 = date.fromisoformat(h.get("end_date") or h["date"])
+        while d0 <= d1:
+            off.add(d0); d0 += timedelta(days=1)
+
+    # This month's attendance up to today (skips Sundays and holidays)
+    students = need(c.call("GET", "/students"), "list students")
+    today = date.today()
+    d = today.replace(day=1)
+    days = 0
+    while d <= today:
+        if d.weekday() != 6 and d not in off:
+            r = random.Random(f"{d}")
+            marks = [{"student_id": s["id"], "status": r.choices(["present", "late", "absent"], [88, 5, 7])[0]} for s in students]
+            need(c.call("POST", "/attendance/batch", {"date": d.isoformat(), "marks": marks}), "mark attendance")
+            days += 1
+        d += timedelta(days=1)
+    print(f"Attendance marked for {days} school days this month.")
+    print("\nDone.\n  Admin : %s / %s  (school code %s)\n  Parent: %s / %s  (two children: Aarav Reddy, Class 3 and Ananya Reddy, Class 7)"
+          % (A.admin, A.password, A.school, PARENT_EMAIL, PARENT_PASSWORD))
+
+
+main()

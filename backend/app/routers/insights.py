@@ -96,10 +96,10 @@ async def student_calendar(student_id: str, month: str = Query(..., description=
         status = marks.get(iso)
         entry = {"date": iso, "weekday": d.weekday(), "status": status, "holiday": holidays.get(iso), "weekend": weekend}
         days.append(entry)
-        if status:
+        if holidays.get(iso):
+            counts["holiday"] += 1          # a school holiday wins over any attendance mark
+        elif status:
             counts[status] += 1
-        elif holidays.get(iso):
-            counts["holiday"] += 1
         elif not weekend and d <= today:
             counts["unmarked"] += 1
         d += timedelta(days=1)
@@ -170,3 +170,29 @@ async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin",
                        "fees_paid": sum(r["fees_paid"] for r in rows), "fees_pending": sum(r["fees_pending"] for r in rows),
                        "defaulters": sum(1 for r in rows if r["fees_pending"] > 0),
                        "low_attendance": sum(1 for r in rows if r["attendance_pct"] is not None and r["attendance_pct"] < 75)}}
+
+
+# ---------- monthly attendance overview for staff (whole school or one class) ----------
+@router.get("/attendance/month")
+async def attendance_month(month: str = Query(..., description="YYYY-MM"), class_id: Optional[str] = None,
+                           ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
+    first, last = _month_bounds(month)
+    sq: dict = {"status": "active"}
+    if class_id:
+        sq["class_id"] = class_id
+    ids = [s["id"] async for s in ctx.db.students.find(sq, {"_id": 0, "id": 1})]
+    per: dict = {}
+    async for a in ctx.db.attendance.find({"student_id": {"$in": ids}, "date": {"$gte": first.isoformat(), "$lte": last.isoformat()}},
+                                          {"_id": 0, "date": 1, "status": 1}):
+        t = per.setdefault(a["date"], {"present": 0, "late": 0, "absent": 0})
+        t[a["status"]] += 1
+    holidays = await _holiday_map(ctx, first, last)
+    days = []
+    d = first
+    while d <= last:
+        iso = d.isoformat()
+        t = per.get(iso, {"present": 0, "late": 0, "absent": 0})
+        days.append({"date": iso, "weekend": d.weekday() == 6, "holiday": holidays.get(iso),
+                     "marked": t["present"] + t["late"] + t["absent"], **t})
+        d += timedelta(days=1)
+    return {"month": month, "students": len(ids), "days": days}
