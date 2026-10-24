@@ -2,23 +2,24 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, GraduationCap, Users, Wallet, CalendarCheck, LogOut, School, UserCog, CreditCard, KeyRound,
-  AlertTriangle, NotebookPen, FileText, Bus, PartyPopper, ClipboardList,
+  AlertTriangle, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart,
 } from "lucide-react";
 
 const ALL_NAV = [
-  { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, testid: "nav-overview" },
-  { to: "/app/diary", label: "Class diary", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary" },
-  { to: "/app/students", label: "Students", parentLabel: "My children", icon: GraduationCap, testid: "nav-students" },
-  { to: "/app/classes", label: "Classes", icon: Users, testid: "nav-classes", roles: ["admin", "teacher"] },
-  { to: "/app/progress", label: "Progress reports", parentLabel: "Progress", icon: ClipboardList, testid: "nav-progress" },
-  { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", roles: ["admin", "parent"] },
-  { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance" },
-  { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", roles: ["admin", "teacher"] },
-  { to: "/app/transport", label: "Transport", icon: Bus, testid: "nav-transport", roles: ["admin"] },
-  { to: "/app/letters", label: "Letters", icon: FileText, testid: "nav-letters", roles: ["admin"] },
-  { to: "/app/users", label: "Users", icon: UserCog, testid: "nav-users", roles: ["admin"] },
-  { to: "/app/billing", label: "Plan & billing", icon: CreditCard, testid: "nav-billing", roles: ["admin"] },
-  { to: "/app/account", label: "My account", icon: KeyRound, testid: "nav-account" },
+  { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, testid: "nav-overview", group: "Today" },
+  { to: "/app/management", label: "Dashboard", icon: PieChart, testid: "nav-management", group: "Today", roles: ["admin"] },
+  { to: "/app/diary", label: "Class diary", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary", group: "Today" },
+  { to: "/app/students", label: "Students", parentLabel: "My children", icon: GraduationCap, testid: "nav-students", group: "School" },
+  { to: "/app/classes", label: "Classes", icon: Users, testid: "nav-classes", group: "School", roles: ["admin", "teacher"] },
+  { to: "/app/progress", label: "Progress reports", parentLabel: "Progress", icon: ClipboardList, testid: "nav-progress", group: "School" },
+  { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", group: "Office", roles: ["admin", "parent"] },
+  { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance", group: "Today" },
+  { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", group: "Today", roles: ["admin", "teacher"] },
+  { to: "/app/transport", label: "Transport", icon: Bus, testid: "nav-transport", group: "School", roles: ["admin"] },
+  { to: "/app/letters", label: "Letters", icon: FileText, testid: "nav-letters", group: "School", roles: ["admin"] },
+  { to: "/app/users", label: "Users", icon: UserCog, testid: "nav-users", group: "Office", roles: ["admin"] },
+  { to: "/app/billing", label: "Plan & billing", icon: CreditCard, testid: "nav-billing", group: "Office", roles: ["admin"] },
+  { to: "/app/account", label: "My account", icon: KeyRound, testid: "nav-account", group: "Office" },
 ];
 
 function SubscriptionBanner({ school, isAdmin }) {
@@ -60,6 +61,7 @@ export default function DashboardLayout() {
     ? ["/app", "/app/progress", "/app/diary", "/app/fees", "/app/attendance"]
     : ["/app", "/app/diary", "/app/students", "/app/attendance", user?.role === "teacher" ? "/app/progress" : "/app/fees"];
   const mobileNav = mobileOrder.map((to) => nav.find((n) => n.to === to)).filter(Boolean);
+  const sections = parent ? [{ title: null, items: nav }] : ["Today", "School", "Office"].map((g) => ({ title: g, items: nav.filter((n) => n.group === g) })).filter((x) => x.items.length);
   const signOut = async () => { await logout(); navigate("/login"); };
 
   const initials = (user?.name || user?.email || "?").split(/[\s@]/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join("");
@@ -82,18 +84,25 @@ export default function DashboardLayout() {
               </div>
             </div>
           </div>
-          <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto" aria-label="Main">
-            {nav.map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.end} data-testid={n.testid}
-                className={({ isActive }) =>
-                  `group relative flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                    isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
-                {({ isActive }) => (<>
-                  {isActive && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-[#E9C46A]" aria-hidden="true" />}
-                  <n.icon className={`h-[18px] w-[18px] ${isActive ? "text-[#8EA2FF]" : ""}`} aria-hidden="true" />
-                  {n.label}
-                </>)}
-              </NavLink>
+          <nav className="flex-1 px-3 overflow-y-auto pb-3" aria-label="Main">
+            {sections.map((sec) => (
+              <div key={sec.title || "all"} className="mb-4">
+                {sec.title && <div className="px-4 pb-1.5 text-xs font-semibold text-slate-500">{sec.title}</div>}
+                <div className="space-y-0.5">
+                  {sec.items.map((n) => (
+                    <NavLink key={n.to} to={n.to} end={n.end} data-testid={n.testid}
+                      className={({ isActive }) =>
+                        `group relative flex items-center gap-3 pl-4 pr-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                          isActive ? "bg-white/10 text-white" : "text-slate-400 hover:bg-white/5 hover:text-white"}`}>
+                      {({ isActive }) => (<>
+                        {isActive && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-[#E9C46A]" aria-hidden="true" />}
+                        <n.icon className={`h-[18px] w-[18px] ${isActive ? "text-[#8EA2FF]" : ""}`} aria-hidden="true" />
+                        {n.label}
+                      </>)}
+                    </NavLink>
+                  ))}
+                </div>
+              </div>
             ))}
           </nav>
           <div className="p-4">

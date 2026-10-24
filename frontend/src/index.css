@@ -91,3 +91,23 @@
   .pill { @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium; }
   .table-head { @apply text-left text-xs font-medium text-slate-500 bg-slate-50/70 border-b border-[#E7E9F1]; }
 }
+
+/* ---- Premium layer ---- */
+.page-hero {
+  background:
+    radial-gradient(520px 260px at 100% 0%, rgba(43, 75, 255, 0.45), transparent 62%),
+    radial-gradient(420px 220px at 0% 120%, rgba(233, 196, 106, 0.16), transparent 60%),
+    #0B1020;
+  box-shadow: 0 24px 48px -28px rgba(11, 16, 32, 0.7), 0 1px 0 rgba(255,255,255,.06) inset;
+}
+.page-hero .btn-primary { background: #E9C46A; color: #0B1020; box-shadow: 0 8px 20px -8px rgba(233,196,106,.7); }
+.page-hero .btn-primary:hover { background: #F2D283; color: #0B1020; }
+.page-hero .ui-input { background: rgba(255,255,255,.96); }
+.ui-card { box-shadow: 0 1px 2px rgba(15, 21, 48, 0.04), 0 14px 32px -18px rgba(15, 21, 48, 0.16); transition: box-shadow .2s, transform .2s, border-color .2s; }
+a.ui-card:hover, .ui-card.hoverable:hover { box-shadow: 0 2px 4px rgba(15,21,48,.05), 0 22px 40px -18px rgba(43,75,255,.28); border-color: #CBD3FF; transform: translateY(-2px); }
+.ui-card table tbody tr { transition: background-color .12s; }
+.ui-card table tbody tr:hover { background: #F7F8FF; }
+.ui-card table td, .ui-card table th { font-variant-numeric: tabular-nums; }
+.table-head th, th.table-head { font-weight: 600; letter-spacing: 0.01em; }
+
+.ruled-light { background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 35px, rgba(255,255,255,.05) 35px, rgba(255,255,255,.05) 36px); }

@@ -1,3 +1,4 @@
+import PageHero from "@/components/PageHero";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, KeyRound, Trash2 } from "lucide-react";
@@ -71,15 +72,10 @@ export default function UsersPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="users-page">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Staff & parent logins</h1>
-          <p className="text-slate-600 mt-1 text-sm">Only people you add here can sign in to your school.</p>
-        </div>
-        <button data-testid="add-user-btn" onClick={() => { setError(""); setShowAdd(true); }} className="ui-btn btn-primary">
+      <PageHero title="Staff & parent logins" subtitle="Only people you add here can sign in to your school."
+        actions={<button data-testid="add-user-btn" onClick={() => { setError(""); setShowAdd(true); }} className="ui-btn btn-primary">
           <Plus className="h-4 w-4" aria-hidden="true" /> Add user
-        </button>
-      </header>
+        </button>} />
 
       <div className="ui-card overflow-x-auto">
         <table className="w-full text-sm">

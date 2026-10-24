@@ -1,3 +1,4 @@
+import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "@/lib/api";
@@ -40,16 +41,12 @@ export default function StudentsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="students-page">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Student directory</h1>
-        </div>
-        {canEdit && (
+      <PageHero title="Student directory" subtitle="Search every student, see their class and guardian, and open a profile with grades, attendance and fees."
+        actions={canEdit && (
           <button data-testid="add-student-btn" onClick={() => setShowForm(true)} className="ui-btn btn-primary">
             <Plus className="h-4 w-4" aria-hidden="true" /> New student
           </button>
-        )}
-      </div>
+        )} />
 
       <div className="ui-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="relative md:col-span-2">

@@ -2,7 +2,7 @@
 
   - 12 classes: PP1, PP2, Class 1 ... Class 10, with 10 students each (120 students)
   - one parent login with two children (in Class 3 and Class 7)
-  - three teachers, each assigned to some classes (Ravi Kumar: Class 3 and Class 4)
+  - six class teachers (Ravi Kumar: Class 3 and Class 4), a secondary teacher on some classes, and a class attender for each
   - Term 1 fees (some paid, some part paid, some unpaid), Term 1 progress reports, this month's attendance, holidays
 
 Safe to run again: anything that already exists is skipped.
@@ -33,8 +33,11 @@ TEACHER_EMAIL, TEACHER_PASSWORD = "teacher@demo.example.com", "Teacher#2026"
 # teacher email -> (name, classes). The first one is the demo teacher login.
 TEACHERS = {TEACHER_EMAIL: ("Ravi Kumar", ["Class 3", "Class 4"]),
             "sunita.rao@demo.example.com": ("Sunita Rao", ["PP1", "PP2"]),
-            "anil.verma@demo.example.com": ("Anil Verma", ["Class 5", "Class 6"])}
-
+            "anil.verma@demo.example.com": ("Anil Verma", ["Class 5", "Class 6"]),
+            "meena.pillai@demo.example.com": ("Meena Pillai", ["Class 1", "Class 2"]),
+            "suresh.naidu@demo.example.com": ("Suresh Naidu", ["Class 7", "Class 8"]),
+            "kavitha.rao@demo.example.com": ("Kavitha Rao", ["Class 9", "Class 10"])}
+ATTENDERS = ["Lakshmi Bai", "Sarojini", "Yadamma", "Narsamma", "Padma", "Kantamma", "Rukmini", "Saraswathi", "Bhagya", "Anjamma", "Sumathi", "Pochamma"]
 
 class Client:
     def __init__(self):
@@ -91,10 +94,33 @@ def main():
 
     need(c.call("POST", "/auth/login", {"school_code": A.school, "email": A.admin, "password": A.password}), "log in as school admin")
 
+    # Teachers first: every class needs a primary class teacher
+    users = {u["email"]: u for u in need(c.call("GET", "/users"), "list users")}
+    teacher_of = {}      # class name -> teacher user
+    for email, (tname, cls_names) in TEACHERS.items():
+        u = users.get(email) or need(c.call("POST", "/users", {"name": tname, "email": email, "role": "teacher", "password": TEACHER_PASSWORD}), f"create teacher {tname}")
+        for cn in cls_names:
+            teacher_of[cn] = u
+    print(f"Teachers ready: {len(TEACHERS)}")
+
+    # Classes: primary teacher, a secondary teacher on every other class, and an attender
     classes = {x["name"]: x for x in need(c.call("GET", "/classes"), "list classes")}
-    for name in CLASSES:
-        if name not in classes:
-            classes[name] = need(c.call("POST", "/classes", {"name": name, "section": "A", "academic_year": "2026-27"}), f"create {name}")
+    team = list(TEACHERS.values())
+    for i, name in enumerate(CLASSES):
+        primary = teacher_of[name]
+        second = None
+        if i % 2 == 0:
+            second = teacher_of[CLASSES[(i + 2) % len(CLASSES)]]
+            if second["id"] == primary["id"]:
+                second = None
+        body = {"name": name, "section": "A", "academic_year": "2026-27", "teacher_id": primary["id"],
+                "secondary_teacher_id": second["id"] if second else None,
+                "attender_name": ATTENDERS[i], "attender_phone": f"98{85000000 + i * 1111:08d}"}
+        cur = classes.get(name)
+        if not cur:
+            classes[name] = need(c.call("POST", "/classes", body), f"create {name}")
+        elif not cur.get("teacher_id") or not cur.get("attender_name"):
+            classes[name] = need(c.call("PUT", f"/classes/{cur['id']}", body), f"update {name}")
     print(f"Classes ready: {len(classes)}")
 
     existing = need(c.call("GET", "/students"), "list students")
@@ -140,16 +166,6 @@ def main():
             created += 1
         print(f"  {cname}: {max(0, 10 - len(mine))} added")
     print(f"Students added: {created}")
-
-    # Teachers, each assigned to some classes
-    users = {u["email"]: u for u in need(c.call("GET", "/users"), "list users")}
-    for email, (tname, cls_names) in TEACHERS.items():
-        u = users.get(email) or need(c.call("POST", "/users", {"name": tname, "email": email, "role": "teacher", "password": TEACHER_PASSWORD}), f"create teacher {tname}")
-        for cn in cls_names:
-            cl = classes[cn]
-            if cl.get("teacher_id") != u["id"]:
-                need(c.call("PUT", f"/classes/{cl['id']}", {"name": cl["name"], "section": cl.get("section") or "", "academic_year": cl.get("academic_year"), "teacher_id": u["id"]}), f"assign {cn}")
-    print(f"Teachers ready: {len(TEACHERS)}")
 
     # Term 1 progress reports (these also fill each student's grades)
     all_students = need(c.call("GET", "/students"), "list students")

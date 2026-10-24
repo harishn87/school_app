@@ -67,7 +67,7 @@ def test_schools_cannot_see_each_others_data(server, new_client):
     a = new_client(); signup(a, "school-a")
     b = new_client(); signup(b, "school-b")
 
-    cls = a.post("/api/classes", json={"name": "Grade 1"}).json()
+    cls = a.post("/api/classes", json={"name": "Grade 1", "teacher_id": _admin_id(a)}).json()
     stu = a.post("/api/students", json={**STUDENT, "class_id": cls["id"]}).json()
     a.post("/api/fees", json={"student_id": stu["id"], "term": "T1", "amount": 1000})
 
@@ -247,7 +247,7 @@ def test_change_password(server, new_client):
 # ---------- core school features still work ----------
 def test_class_student_fee_attendance_flow(server):
     signup(server, "greenwood")
-    cls = server.post("/api/classes", json={"name": "Grade 5", "section": "A"}).json()
+    cls = server.post("/api/classes", json={"name": "Grade 5", "section": "A", "teacher_id": _admin_id(server)}).json()
     s = server.post("/api/students", json={**STUDENT, "class_id": cls["id"]}).json()
     assert server.post("/api/students", json={**STUDENT, "class_id": "missing"}).status_code == 400
 
@@ -296,3 +296,8 @@ def test_migrate_single_school(server, new_client):
     r = login(c, "old-school", "boss@old.example.com")
     assert r.status_code == 200 and r.json()["school"]["plan"] == "basic"
     assert [s["id"] for s in c.get("/api/students").json()] == ["s1"]
+
+
+def _admin_id(admin):
+    """Id of the school admin, used as a stand-in class teacher in tests."""
+    return next(u["id"] for u in admin.get("/api/users").json() if u["role"] == "admin")

@@ -26,7 +26,7 @@ async def _class_for_posting(ctx: TenantContext, class_id: str) -> dict:
     cls = await ctx.db.classes.find_one({"id": class_id}, {"_id": 0})
     if not cls:
         raise HTTPException(status_code=400, detail="Class not found")
-    if ctx.role == "teacher" and cls.get("teacher_id") != ctx.user["id"]:
+    if ctx.role == "teacher" and ctx.user["id"] not in (cls.get("teacher_id"), cls.get("secondary_teacher_id")):
         raise HTTPException(status_code=403, detail="You can post only to classes assigned to you. Ask your school admin to assign this class to you.")
     return cls
 

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Plus, Save, X } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import PageHero from "@/components/PageHero";
 import ReportCard from "@/components/ReportCard";
 
 const TERMS = ["Term 1", "Term 2", "Term 3", "Annual"];
@@ -19,10 +20,7 @@ function ParentProgress() {
   }, []);
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-up" data-testid="progress-parent">
-      <header>
-        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold">Progress reports</h1>
-        <p className="text-slate-500 mt-1">Marks and teacher remarks, updated by your child&apos;s class teacher.</p>
-      </header>
+      <PageHero title="Progress reports" subtitle="Marks and teacher remarks, updated by your child's class teacher." />
       {kids && kids.length === 0 && <div className="ui-card p-8 text-center text-slate-500">No students are linked to your account yet.</div>}
       {kids?.map((k) => {
         const mine = reports.filter((r) => r.student_id === k.id);
@@ -129,15 +127,10 @@ function StaffProgress() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-5 animate-fade-up" data-testid="progress-page">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-[28px] font-semibold">Progress reports</h1>
-          <p className="text-slate-500 mt-1">Enter marks and remarks for the class. Parents see them as soon as you save.</p>
-        </div>
-        <button type="button" onClick={save} disabled={saving || !students.length} className="ui-btn btn-primary" data-testid="progress-save">
+      <PageHero title="Progress reports" subtitle="Enter marks and remarks for the class. Parents see them as soon as you save."
+        actions={<button type="button" onClick={save} disabled={saving || !students.length} className="ui-btn btn-primary" data-testid="progress-save">
           <Save className="h-4 w-4" aria-hidden="true" /> {saving ? "Saving…" : dirty ? "Save and publish" : "Save"}
-        </button>
-      </header>
+        </button>} />
 
       <div className="ui-card p-4 grid sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
         <div><label className="field-label" htmlFor="pr-class">Class</label>

@@ -1,6 +1,6 @@
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 from .config import get_settings
 
@@ -107,8 +107,17 @@ class StudentIn(BaseModel):
 class ClassIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     section: Optional[str] = Field(default="", max_length=20)
-    teacher_id: Optional[str] = None
+    teacher_id: str = Field(min_length=1)                  # primary class teacher (required)
+    secondary_teacher_id: Optional[str] = None             # optional second teacher
+    attender_name: Optional[str] = Field(default=None, max_length=120)    # class attender / helper
+    attender_phone: Optional[str] = Field(default=None, max_length=30)
     academic_year: Optional[str] = Field(default=None, max_length=20)
+
+    @model_validator(mode="after")
+    def _teachers_differ(self):
+        if self.secondary_teacher_id and self.secondary_teacher_id == self.teacher_id:
+            raise ValueError("The secondary teacher must be a different person from the primary teacher")
+        return self
 
 
 class FeeIn(BaseModel):

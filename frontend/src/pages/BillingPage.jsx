@@ -1,3 +1,4 @@
+import PageHero from "@/components/PageHero";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Check, Clock } from "lucide-react";
@@ -48,9 +49,7 @@ export default function BillingPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="billing-page">
-      <header>
-        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Your subscription</h1>
-      </header>
+      <PageHero title="Your subscription" subtitle="Your plan, how much of it you are using, and the plans you can move to." />
 
       <div className="grid md:grid-cols-2 gap-6">
         <div className="ui-card p-6">

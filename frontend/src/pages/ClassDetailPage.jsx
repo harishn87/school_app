@@ -1,6 +1,7 @@
+import PageHero from "@/components/PageHero";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarCheck, GraduationCap, TrendingUp, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarCheck, GraduationCap, Phone, TrendingUp, UserRound, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
 import { formatDate, formatMoney } from "@/lib/utils";
 import SchoolMonthCalendar from "@/components/SchoolMonthCalendar";
@@ -16,8 +17,9 @@ const FEE = {
 function Tile({ icon: Icon, label, value, sub, testid }) {
   return (
     <div className="ui-card p-5">
-      <div className="flex items-center gap-2 text-sm text-slate-500"><Icon className="h-4 w-4 text-[#2B4BFF]" aria-hidden="true" /> {label}</div>
-      <div className="font-heading text-2xl font-semibold mt-1.5" data-testid={testid}>{value}</div>
+      <span className="h-9 w-9 grid place-items-center rounded-xl bg-[#E8ECFF] text-[#2B4BFF]"><Icon className="h-[18px] w-[18px]" aria-hidden="true" /></span>
+      <div className="font-heading text-3xl font-semibold mt-3 tabular-nums" data-testid={testid}>{value}</div>
+      <div className="text-sm text-slate-500 mt-0.5">{label}</div>
       {sub && <div className="text-xs text-slate-500 mt-0.5">{sub}</div>}
     </div>
   );
@@ -26,7 +28,7 @@ function Tile({ icon: Icon, label, value, sub, testid }) {
 export default function ClassDetailPage() {
   const { id } = useParams();
   const [cls, setCls] = useState(null);
-  const [teacher, setTeacher] = useState(null);
+  const [staff, setStaff] = useState([]);
   const [ov, setOv] = useState(null);
   const [posts, setPosts] = useState([]);
   const [day, setDay] = useState(new Date().toLocaleDateString("en-CA"));
@@ -40,7 +42,7 @@ export default function ClassDetailPage() {
         const found = c.data.find((x) => x.id === id);
         if (!found) { setMissing(true); return; }
         setCls(found); setOv(o.data); setPosts(p.data);
-        if (found.teacher_id) api.get("/users").then((u) => setTeacher(u.data.find((x) => x.id === found.teacher_id) || null)).catch(() => {});
+        api.get("/users").then((u) => setStaff(u.data)).catch(() => {});
       } catch (_e) { setMissing(true); }
     })();
   }, [id]);
@@ -64,10 +66,24 @@ export default function ClassDetailPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="class-detail">
-      <div>
-        <Link to="/app/classes" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-[#2B4BFF]"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> All classes</Link>
-        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold mt-1" data-testid="class-title">{cls.name}{cls.section ? ` ${cls.section}` : ""}</h1>
-        <p className="text-slate-500 mt-1">{teacher ? `Class teacher: ${teacher.name}` : "No class teacher assigned"}{cls.academic_year ? ` · ${cls.academic_year}` : ""}</p>
+      <PageHero testid="class-hero" title={<span data-testid="class-title">{cls.name}{cls.section ? ` ${cls.section}` : ""}</span>}
+        subtitle={cls.academic_year ? `Academic year ${cls.academic_year}` : "Class overview"}
+        actions={<Link to="/app/classes" className="ui-btn text-sm"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> All classes</Link>} />
+
+      <div className="grid sm:grid-cols-3 gap-3" data-testid="class-team">
+        {[["Class teacher", staff.find((x) => x.id === cls.teacher_id)?.name || (cls.teacher_id ? "Assigned" : "Not assigned"), "primary"],
+          ["Second teacher", staff.find((x) => x.id === cls.secondary_teacher_id)?.name || (cls.secondary_teacher_id ? "Assigned" : "None"), "secondary"]].map(([label, name, k]) => (
+          <div key={k} className="ui-card p-4 flex items-center gap-3" data-testid={`team-${k}`}>
+            <span className="h-10 w-10 grid place-items-center rounded-xl bg-[#E8ECFF] text-[#2B4BFF]"><UserRound className="h-5 w-5" aria-hidden="true" /></span>
+            <div className="min-w-0"><div className="text-xs text-slate-500">{label}</div><div className="font-medium truncate">{name}</div></div>
+          </div>
+        ))}
+        <div className="ui-card p-4 flex items-center gap-3" data-testid="team-attender">
+          <span className="h-10 w-10 grid place-items-center rounded-xl bg-[#E8ECFF] text-[#2B4BFF]"><Phone className="h-5 w-5" aria-hidden="true" /></span>
+          <div className="min-w-0"><div className="text-xs text-slate-500">Attender</div>
+            <div className="font-medium truncate">{cls.attender_name || "None"}</div>
+            {cls.attender_phone && <a href={`tel:${cls.attender_phone.replace(/\s/g, "")}`} className="text-sm text-[#2B4BFF] hover:underline">{cls.attender_phone}</a>}</div>
+        </div>
       </div>
 
       <div className={`grid grid-cols-2 gap-4 ${showFees ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
@@ -98,7 +114,10 @@ export default function ClassDetailPage() {
                     <td className="px-4 py-2.5"><Link className="font-medium hover:text-[#2B4BFF]" to={`/app/students/${s.id}`}>{s.name}</Link></td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.grade_avg == null ? "-" : `${s.grade_avg}%`}</td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{s.attendance_pct == null ? "-" : `${s.attendance_pct}%`}{s.attendance_pct != null && s.attendance_pct < 75 ? " ⚠" : ""}</td>
-                    {showFees && <td className="px-4 py-2.5 text-right"><span className={`pill ${fc}`}>{fl}</span>{s.fees_pending > 0 && <span className="ml-2 tabular-nums text-slate-600">{formatMoney(s.fees_pending)}</span>}</td>}
+                    {showFees && <td className="px-4 py-2.5 text-right">
+                      <Link to={`/app/fees?student=${s.id}`} className="inline-flex items-center justify-end rounded-lg px-1.5 py-1 -mr-1.5 hover:bg-[#E8ECFF] transition-colors" title="Open this student's fees" data-testid={`cd-fee-${s.id}`}>
+                        <span className={`pill ${fc}`}>{fl}</span>{s.fees_pending > 0 && <span className="ml-2 tabular-nums text-slate-600">{formatMoney(s.fees_pending)}</span>}
+                      </Link></td>}
                   </tr>
                 );
               })}

@@ -1,4 +1,6 @@
+import PageHero from "@/components/PageHero";
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { toast } from "sonner";
 import { Save, CalendarCheck, CheckCircle2, XCircle, Clock } from "lucide-react";
@@ -10,8 +12,10 @@ export default function AttendancePage() {
   const { user } = useAuth();
   const canMark = user?.role === "admin" || user?.role === "teacher";
 
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [classId, setClassId] = useState("");
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const [date, setDate] = useState(params.get("date") || new Date().toLocaleDateString("en-CA"));
+  const [classId, setClassId] = useState(params.get("class") || "");
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
   const [marks, setMarks] = useState({}); // {student_id: status}
@@ -99,9 +103,7 @@ export default function AttendancePage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="attendance-page">
-      <div>
-        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Daily attendance</h1>
-      </div>
+      <PageHero title="Daily attendance" subtitle="Mark a class in a few taps, or click any date on the calendar to see every class for that day." />
 
       <div className="ui-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
         <div>
@@ -125,13 +127,13 @@ export default function AttendancePage() {
         )}
       </div>
 
-      <SchoolMonthCalendar classId={classId} selected={date} onPick={setDate} refreshKey={refresh} />
+      <SchoolMonthCalendar classId={classId} selected={date} onPick={(d) => navigate(`/app/attendance/day/${d}${classId ? `?class=${classId}` : ""}`)} refreshKey={refresh} />
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Mini label="Present" value={stats.present} color="bg-[#E6F8EE]" />
-        <Mini label="Absent" value={stats.absent} color="bg-red-200" />
-        <Mini label="Late" value={stats.late} color="bg-[#FEF3C7]" />
-        <Mini label="Unmarked" value={stats.unmarked} color="bg-white" />
+        <Mini label="Present" value={stats.present} color="bg-emerald-500" />
+        <Mini label="Absent" value={stats.absent} color="bg-rose-500" />
+        <Mini label="Late" value={stats.late} color="bg-amber-400" />
+        <Mini label="Unmarked" value={stats.unmarked} color="bg-slate-300" />
       </div>
 
       <div className="ui-card overflow-hidden">
@@ -172,9 +174,10 @@ export default function AttendancePage() {
 
 function Mini({ label, value, color }) {
   return (
-    <div className={`ui-card p-4 ${color}`}>
-      <div className="text-xs font-medium">{label}</div>
-      <div className="font-heading text-3xl font-semibold tracking-tight mt-1">{value}</div>
+    <div className="ui-card p-4 flex gap-3">
+      <span className={`w-1.5 rounded-full shrink-0 ${color}`} aria-hidden="true" />
+      <div><div className="text-sm text-slate-500">{label}</div>
+      <div className="font-heading text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">{value}</div></div>
     </div>
   );
 }

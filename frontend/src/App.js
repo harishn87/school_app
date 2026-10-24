@@ -17,8 +17,10 @@ import AccountPage from "@/pages/AccountPage";
 import DiaryPage from "@/pages/DiaryPage";
 import LettersPage from "@/pages/LettersPage";
 import HolidaysPage from "@/pages/HolidaysPage";
+import ManagementDashboard from "@/pages/ManagementDashboard";
 import ClassDetailPage from "@/pages/ClassDetailPage";
 import ProgressPage from "@/pages/ProgressPage";
+import DayAttendancePage from "@/pages/DayAttendancePage";
 import TransportPage from "@/pages/TransportPage";
 import ParentHome from "@/pages/ParentHome";
 import PlatformLoginPage from "@/pages/platform/PlatformLoginPage";
@@ -76,7 +78,9 @@ export default function App() {
             <Route path="attendance" element={<AttendancePage />} />
             <Route path="users" element={<RoleOnly roles={["admin"]}><UsersPage /></RoleOnly>} />
             <Route path="transport" element={<RoleOnly roles={["admin"]}><TransportPage /></RoleOnly>} />
+            <Route path="attendance/day/:date" element={<RoleOnly roles={["admin", "teacher"]}><DayAttendancePage /></RoleOnly>} />
             <Route path="progress" element={<ProgressPage />} />
+            <Route path="management" element={<RoleOnly roles={["admin"]}><ManagementDashboard /></RoleOnly>} />
             <Route path="holidays" element={<RoleOnly roles={["admin", "teacher"]}><HolidaysPage /></RoleOnly>} />
             <Route path="letters" element={<RoleOnly roles={["admin"]}><LettersPage /></RoleOnly>} />
             <Route path="billing" element={<RoleOnly roles={["admin"]}><BillingPage /></RoleOnly>} />

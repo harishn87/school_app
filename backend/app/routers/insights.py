@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..models import HolidayIn
 from ..security import TenantContext, get_ctx, require_roles
 from ..utils import new_id, now_iso
-from .school import fee_status, scope_for
+from .school import class_teacher_query, fee_status, scope_for
 
 router = APIRouter(tags=["insights"])
 
@@ -113,7 +113,7 @@ async def student_calendar(student_id: str, month: str = Query(..., description=
 @router.get("/dashboard/overview")
 async def dashboard_overview(ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
     teacher = ctx.role == "teacher"
-    classes = {c["id"]: c async for c in ctx.db.classes.find({"teacher_id": ctx.user["id"]} if teacher else {}, {"_id": 0})}
+    classes = {c["id"]: c async for c in ctx.db.classes.find(class_teacher_query(ctx.user["id"]) if teacher else {}, {"_id": 0})}
     students = await ctx.db.students.find({"status": "active", **await scope_for(ctx)}, {"_id": 0, "photo_base64": 0}).to_list(3000)
     ids = {s["id"] for s in students}
     since = (datetime.now(timezone.utc).date() - timedelta(days=30)).isoformat()
@@ -202,3 +202,114 @@ async def attendance_month(month: str = Query(..., description="YYYY-MM"), class
                      "marked": t["present"] + t["late"] + t["absent"], **t})
         d += timedelta(days=1)
     return {"month": month, "students": len(ids), "days": days}
+
+
+# ---------- one day, class by class ----------
+@router.get("/attendance/day")
+async def attendance_day(date_str: str = Query(..., alias="date"), class_id: Optional[str] = None,
+                         ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
+    day = _parse(date_str)
+    cq: dict = class_teacher_query(ctx.user["id"]) if ctx.role == "teacher" else {}
+    if class_id:
+        cq = {"$and": [cq, {"id": class_id}]} if cq else {"id": class_id}
+    classes = await ctx.db.classes.find(cq, {"_id": 0}).to_list(1000)
+    users = {u["id"]: u["name"] async for u in ctx.db.users.find({}, {"_id": 0, "id": 1, "name": 1})}
+    students = await ctx.db.students.find({"status": "active", "class_id": {"$in": [c["id"] for c in classes]}},
+                                          {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "roll_number": 1, "class_id": 1}).to_list(5000)
+    marks = {a["student_id"]: a["status"] async for a in ctx.db.attendance.find(
+        {"date": day.isoformat(), "student_id": {"$in": [s["id"] for s in students]}}, {"_id": 0, "student_id": 1, "status": 1})}
+    holiday = (await _holiday_map(ctx, day, day)).get(day.isoformat())
+    out = []
+    for c in classes:
+        roster = []
+        for s in sorted((s for s in students if s["class_id"] == c["id"]),
+                        key=lambda s: (int(s["roll_number"]) if str(s.get("roll_number") or "").isdigit() else 9999, s["first_name"])):
+            roster.append({"id": s["id"], "name": f"{s['first_name']} {s.get('last_name', '')}".strip(),
+                           "roll_number": s.get("roll_number"), "status": marks.get(s["id"])})
+        n = {k: sum(1 for r in roster if r["status"] == k) for k in ("present", "late", "absent")}
+        marked = sum(n.values())
+        out.append({"class_id": c["id"], "class_name": f"{c['name']} {c.get('section') or ''}".strip(), "name": c["name"],
+                    "teacher": users.get(c.get("teacher_id")), "secondary_teacher": users.get(c.get("secondary_teacher_id")),
+                    "attender_name": c.get("attender_name"), "attender_phone": c.get("attender_phone"),
+                    "total": len(roster), **n, "unmarked": len(roster) - marked,
+                    "percent": round((n["present"] + n["late"]) / marked * 100) if marked else None, "students": roster})
+    return {"date": day.isoformat(), "weekday": day.strftime("%A"), "holiday": holiday, "weekend": day.weekday() == 6, "classes": out,
+            "totals": {k: sum(c[k] for c in out) for k in ("total", "present", "late", "absent", "unmarked")}}
+
+
+# ---------- management dashboard: the whole school in one payload ----------
+def _months_back(today: date, n: int) -> list:
+    out, y, m = [], today.year, today.month
+    for _ in range(n):
+        out.append(f"{y}-{m:02d}")
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+    return out[::-1]
+
+
+@router.get("/dashboard/school")
+async def dashboard_school(ctx: TenantContext = Depends(require_roles("admin"))):
+    today = datetime.now(timezone.utc).date()
+    classes = {c["id"]: c async for c in ctx.db.classes.find({}, {"_id": 0})}
+    users = {u["id"]: u["name"] async for u in ctx.db.users.find({}, {"_id": 0, "id": 1, "name": 1})}
+    students = await ctx.db.students.find({"status": "active"}, {"_id": 0, "photo_base64": 0}).to_list(5000)
+    ids = {s["id"] for s in students}
+    bus = {t["student_id"] async for t in ctx.db.transport.find({}, {"_id": 0, "student_id": 1})}
+
+    since30 = (today - timedelta(days=30)).isoformat()
+    months = _months_back(today, 6)
+    first_month = months[0] + "-01"
+    att30: dict = {}
+    monthly: dict = {m: [0, 0] for m in months}
+    todays = {"present": 0, "late": 0, "absent": 0}
+    async for a in ctx.db.attendance.find({"date": {"$gte": min(since30, first_month)}}, {"_id": 0, "student_id": 1, "status": 1, "date": 1}):
+        if a["student_id"] not in ids:
+            continue
+        good = a["status"] in ("present", "late")
+        if a["date"] >= since30:
+            t = att30.setdefault(a["student_id"], [0, 0]); t[1] += 1; t[0] += 1 if good else 0
+        mk = monthly.get(a["date"][:7])
+        if mk is not None:
+            mk[1] += 1; mk[0] += 1 if good else 0
+        if a["date"] == today.isoformat():
+            todays[a["status"]] += 1
+
+    fees: dict = {}
+    by_term: dict = {}
+    async for f in ctx.db.fees.find({}, {"_id": 0}):
+        if f["student_id"] not in ids:
+            continue
+        amt, paid = float(f.get("amount", 0)), float(f.get("paid_amount", 0))
+        t = fees.setdefault(f["student_id"], [0.0, 0.0]); t[0] += amt; t[1] += paid
+        b = by_term.setdefault(f.get("term") or "Other", [0.0, 0.0]); b[0] += amt; b[1] += paid
+
+    rows, subj, subj_class = [], {}, {}
+    for s in students:
+        g = [x for x in (s.get("grades") or []) if float(x.get("max_score") or 0) > 0]
+        for x in g:
+            pct = float(x["score"]) / float(x["max_score"]) * 100
+            a = subj.setdefault(x["subject"], [0.0, 0]); a[0] += pct; a[1] += 1
+            c = subj_class.setdefault(s.get("class_id") or "none", {}).setdefault(x["subject"], [0.0, 0]); c[0] += pct; c[1] += 1
+        avg = round(sum(float(x["score"]) / float(x["max_score"]) for x in g) / len(g) * 100) if g else None
+        a30 = att30.get(s["id"])
+        total, paid = fees.get(s["id"], [0.0, 0.0])
+        c = classes.get(s.get("class_id"))
+        rows.append({
+            "id": s["id"], "name": f"{s['first_name']} {s.get('last_name', '')}".strip(), "gender": s.get("gender") or "unspecified",
+            "class_id": s.get("class_id"), "class_name": f"{c['name']} {c.get('section') or ''}".strip() if c else "No class",
+            "teacher": users.get(c.get("teacher_id")) if c else None, "bus": s["id"] in bus,
+            "grade_avg": avg, "attendance_pct": round(a30[0] / a30[1] * 100) if a30 else None,
+            "fees_total": total, "fees_paid": paid, "fees_pending": max(total - paid, 0),
+            "fee_status": fee_status(total, paid) if total else "none",
+        })
+    marked = todays["present"] + todays["late"] + todays["absent"]
+    return {
+        "as_of": today.isoformat(), "students": rows,
+        "classes": [{"id": c["id"], "name": f"{c['name']} {c.get('section') or ''}".strip(), "base": c["name"], "teacher": users.get(c.get("teacher_id"))} for c in classes.values()],
+        "today": {**todays, "unmarked": len(rows) - marked, "total": len(rows)},
+        "monthly_attendance": [{"month": m, "pct": round(v[0] / v[1] * 100) if v[1] else None, "marked": v[1]} for m, v in monthly.items()],
+        "fees_by_term": [{"term": k, "billed": v[0], "collected": v[1]} for k, v in sorted(by_term.items())],
+        "subjects": [{"subject": k, "avg": round(v[0] / v[1]), "n": v[1]} for k, v in sorted(subj.items())],
+        "subjects_by_class": {cid: {k: round(v[0] / v[1]) for k, v in d.items()} for cid, d in subj_class.items()},
+    }

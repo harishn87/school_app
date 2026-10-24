@@ -1,3 +1,4 @@
+import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Plus, Trash2, PartyPopper } from "lucide-react";
@@ -36,15 +37,10 @@ export default function HolidaysPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-up" data-testid="holidays-page">
-      <header className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-[28px] font-semibold">Holidays</h1>
-          <p className="text-slate-500 mt-1">Parents see these on their child&apos;s attendance calendar. Sundays are shown as off automatically.</p>
-        </div>
-        <select className="ui-input !w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year" data-testid="holiday-year">
+      <PageHero title="Holidays" subtitle="Parents see these on their child's attendance calendar. Sundays are shown as off automatically."
+        actions={<select className="ui-input !w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year" data-testid="holiday-year">
           {[year - 1, year, year + 1].filter((v, i, a) => a.indexOf(v) === i).map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
-      </header>
+        </select>} />
 
       {admin && (
         <form onSubmit={add} className="ui-card p-5 grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 items-end" data-testid="holiday-form">

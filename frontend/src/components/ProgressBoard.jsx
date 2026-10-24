@@ -117,8 +117,10 @@ export default function ProgressBoard() {
                     <td className="px-4 py-3"><Bar value={s.grade_avg} /></td>
                     <td className="px-4 py-3"><Bar value={s.attendance_pct} low={s.attendance_pct != null && s.attendance_pct < 75} /></td>
                     {showFees && <td className="px-4 py-3 text-right">
-                      <div className="tabular-nums font-medium">{s.fees_pending > 0 ? formatMoney(s.fees_pending) : s.fees_total ? "Nil" : "-"}</div>
-                      <span className={`pill ${fc} mt-0.5`}>{fl}</span>
+                      <Link to={`/app/fees?student=${s.id}`} className="block rounded-lg px-1.5 py-0.5 -mr-1.5 hover:bg-[#E8ECFF] transition-colors" title="Open this student's fees" data-testid={`board-fee-${s.id}`}>
+                        <div className="tabular-nums font-medium">{s.fees_pending > 0 ? formatMoney(s.fees_pending) : s.fees_total ? "Nil" : "-"}</div>
+                        <span className={`pill ${fc} mt-0.5`}>{fl}</span>
+                      </Link>
                     </td>}
                   </tr>
                 );

@@ -1,6 +1,6 @@
 """Class diary and parent overview."""
 from conftest import login, signup
-from test_school_api import _make_user
+from test_school_api import _admin_id, _make_user
 
 
 def _setup(server, new_client):
@@ -11,7 +11,7 @@ def _setup(server, new_client):
     _make_user(admin, "parent", "mom@family.example.com")
     _make_user(admin, "parent", "other@family.example.com")
     c5 = admin.post("/api/classes", json={"name": "Grade 5", "section": "A", "teacher_id": t1["id"]}).json()
-    c6 = admin.post("/api/classes", json={"name": "Grade 6", "section": "B"}).json()
+    c6 = admin.post("/api/classes", json={"name": "Grade 6", "section": "B", "teacher_id": _admin_id(admin)}).json()
     kid = admin.post("/api/students", json={"first_name": "Aarav", "last_name": "Sharma", "joining_date": "2025-06-01",
                                             "class_id": c5["id"], "guardian_email": "mom@family.example.com"}).json()
     admin.post("/api/students", json={"first_name": "Zed", "last_name": "Other", "joining_date": "2025-06-01",

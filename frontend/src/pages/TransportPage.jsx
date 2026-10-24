@@ -1,3 +1,4 @@
+import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ArrowDown, ArrowUp, Bus, MapPin, Pencil, Phone, Plus, Search, Trash2, Users, X } from "lucide-react";
@@ -60,18 +61,11 @@ export default function TransportPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="transport-page">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-[28px] font-semibold">Transport</h1>
-          <p className="text-slate-500 mt-1">Buses, routes and which stop each student uses. Parents see their child&apos;s bus in their app.</p>
-        </div>
-        {admin && (
-          <div className="flex gap-2">
-            {tab === "buses" && <button className="ui-btn btn-primary" data-testid="new-bus" onClick={() => setBusModal({})}><Plus className="h-4 w-4" aria-hidden="true" /> New bus</button>}
-            {tab === "routes" && <button className="ui-btn btn-primary" data-testid="new-route" onClick={() => setRouteModal({})}><Plus className="h-4 w-4" aria-hidden="true" /> New route</button>}
-          </div>
-        )}
-      </header>
+      <PageHero title="Transport" subtitle="Buses, routes and which stop each student uses. Parents see their child's bus in their app."
+        actions={admin && (<>
+          {tab === "buses" && <button className="ui-btn btn-primary" data-testid="new-bus" onClick={() => setBusModal({})}><Plus className="h-4 w-4" aria-hidden="true" /> New bus</button>}
+          {tab === "routes" && <button className="ui-btn btn-primary" data-testid="new-route" onClick={() => setRouteModal({})}><Plus className="h-4 w-4" aria-hidden="true" /> New route</button>}
+        </>)} />
 
       <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Transport sections">
         {[["routes", "Routes"], ["buses", "Buses"], ["students", "Students"]].map(([k, l]) => (

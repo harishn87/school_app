@@ -9,9 +9,9 @@ import ProgressBoard from "@/components/ProgressBoard";
 function Ring({ pct }) {
   const r = 52, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0));
   return (
-    <svg viewBox="0 0 128 128" className="h-28 w-28 -rotate-90" role="img" aria-label={`${v}% present today`}>
-      <circle cx="64" cy="64" r={r} fill="none" stroke="#E8ECFF" strokeWidth="12" />
-      <circle cx="64" cy="64" r={r} fill="none" stroke="#2B4BFF" strokeWidth="12" strokeLinecap="round"
+    <svg viewBox="0 0 128 128" className="h-20 w-20 -rotate-90" role="img" aria-label={`${v}% present today`}>
+      <circle cx="64" cy="64" r={r} fill="none" stroke="#E8ECFF" strokeWidth="14" />
+      <circle cx="64" cy="64" r={r} fill="none" stroke="#2B4BFF" strokeWidth="14" strokeLinecap="round"
         strokeDasharray={c} strokeDashoffset={c * (1 - v / 100)} />
     </svg>
   );
@@ -21,8 +21,8 @@ function Small({ icon: Icon, label, value, testid, tone = "blue" }) {
   const tones = { blue: "bg-[#E8ECFF] text-[#2B4BFF]", amber: "bg-amber-50 text-amber-600", slate: "bg-slate-100 text-slate-600" };
   return (
     <div className="ui-card p-5">
-      <div className={`h-10 w-10 grid place-items-center rounded-xl ${tones[tone]}`}><Icon className="h-5 w-5" aria-hidden="true" /></div>
-      <div className="mt-4 font-heading text-3xl font-semibold" data-testid={testid}>{value}</div>
+      <div className={`h-9 w-9 grid place-items-center rounded-lg ${tones[tone]}`}><Icon className="h-[18px] w-[18px]" aria-hidden="true" /></div>
+      <div className="mt-3 font-heading text-3xl font-semibold tabular-nums" data-testid={testid}>{value}</div>
       <div className="text-sm text-slate-500 mt-0.5">{label}</div>
     </div>
   );
@@ -57,7 +57,7 @@ export default function DashboardHome() {
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="font-heading text-2xl sm:text-[30px] font-semibold">
-            Good to see you, {user?.name?.split(" ")[0] || "there"}
+            {new Date().getHours() < 12 ? "Good morning" : new Date().getHours() < 17 ? "Good afternoon" : "Good evening"}, {user?.name?.split(" ")[0] || "there"}
           </h1>
           <p className="text-slate-500 mt-1">
             {parent ? "Here's how your children are doing." : <>Here&apos;s what&apos;s happening at {user?.school?.name || "your school"}.</>}
@@ -66,68 +66,73 @@ export default function DashboardHome() {
         <div className="text-sm text-slate-500">{today}</div>
       </header>
 
-      <div className="grid lg:grid-cols-3 gap-6" data-testid="stats-grid">
-        {teacher ? (
-          <section className="lg:col-span-2 rounded-3xl p-7 text-white relative overflow-hidden surface-midnight" data-testid="teacher-hero" style={{ boxShadow: "0 24px 50px -24px rgba(35,64,240,.7)" }}>
-            <div className="text-sm text-slate-300">Your students</div>
-            <div className="font-heading text-4xl sm:text-5xl font-semibold mt-2">{n(stats.total_students)}</div>
-            <p className="text-sm text-slate-300 mt-2">across {n(stats.total_classes)} {stats.total_classes === 1 ? "class" : "classes"}</p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Link to="/app/progress" className="inline-flex items-center gap-1 text-sm rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5">Update progress reports <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
-              <Link to="/app/attendance" className="inline-flex items-center gap-1 text-sm rounded-lg bg-white/10 hover:bg-white/20 px-3 py-1.5">Mark attendance <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
-            </div>
+      <div data-testid="stats-grid" className="space-y-6">
+        {!parent && (
+          <section className="rounded-2xl surface-midnight ruled-light p-7 sm:p-9 text-white" data-testid={teacher ? "teacher-hero" : "briefing"}>
+            {teacher ? (
+              <>
+                <p className="font-heading text-3xl sm:text-4xl font-semibold leading-tight max-w-2xl">
+                  You have {n(stats.total_students)} students across {n(stats.total_classes)} {stats.total_classes === 1 ? "class" : "classes"}.
+                </p>
+                <div className="mt-6 flex flex-wrap gap-3">
+                  <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">Mark attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
+                  <Link to="/app/progress" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">Update progress reports</Link>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="font-heading text-3xl sm:text-4xl font-semibold leading-tight max-w-3xl">
+                  {stats.attendance_today_pct == null
+                    ? "Attendance isn't marked yet today."
+                    : <>{stats.attendance_today_pct}% of students are in school today.</>}{" "}
+                  <span className="text-[#E9C46A]">{formatMoney(pending)} in fees is still to collect.</span>
+                </p>
+                <div className="mt-7 flex flex-wrap gap-3">
+                  <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">Mark attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
+                  <Link to="/app/fees" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">View fees</Link>
+                  {user?.role === "admin" && <Link to="/app/management" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">School dashboard</Link>}
+                </div>
+              </>
+            )}
           </section>
-        ) : (
-        /* Fees: the one hero card */
-        <section className="lg:col-span-2 rounded-3xl p-7 text-white relative overflow-hidden surface-midnight"
-          style={{ boxShadow: "0 24px 50px -24px rgba(35,64,240,.7)" }}>
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="text-sm text-slate-300">Fees collected</div>
-              <div className="font-heading text-4xl sm:text-5xl font-semibold mt-2" data-testid="stat-fees_collected">
-                {stats.fees_collected == null ? "—" : formatMoney(collected)}
-              </div>
-            </div>
-            <Link to="/app/fees" className="inline-flex items-center gap-1 text-sm text-slate-200 hover:text-white rounded-lg bg-white/10 px-3 py-1.5">
-              View fees <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-          <div className="mt-8">
-            <div className="h-2.5 rounded-full bg-white/10 overflow-hidden">
-              <div className="h-full rounded-full bg-gradient-to-r from-[#7C8FFF] to-[#E9C46A]" style={{ width: `${paidPct}%` }} />
-            </div>
-            <div className="mt-3 flex justify-between text-sm">
-              <span className="text-slate-300">{paidPct}% of billed fees received</span>
-              <span className="text-slate-300">Pending <b className="text-white font-medium" data-testid="stat-fees_pending">{stats.fees_pending == null ? "—" : formatMoney(pending)}</b></span>
-            </div>
-          </div>
-        </section>
         )}
 
-        <section className="ui-card p-6 flex items-center gap-5">
-          <div className="relative shrink-0">
-            <Ring pct={stats.attendance_today_pct} />
-            <div className="absolute inset-0 grid place-items-center">
-              <span className="font-heading text-2xl font-semibold" data-testid="stat-attendance_today_pct">
-                {stats.attendance_today_pct == null ? "—" : `${stats.attendance_today_pct}%`}
-              </span>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {!teacher && (
+            <section className="ui-card p-5 col-span-2" >
+              <div className="text-sm text-slate-500">Fees collected</div>
+              <div className="font-heading text-3xl font-semibold mt-1 tabular-nums" data-testid="stat-fees_collected">{stats.fees_collected == null ? "—" : formatMoney(collected)}</div>
+              <div className="mt-4 h-2 rounded-full bg-[#E8ECFF] overflow-hidden"><div className="h-full rounded-full bg-[#2B4BFF]" style={{ width: `${paidPct}%` }} /></div>
+              <div className="mt-2 flex justify-between text-xs text-slate-500">
+                <span>{paidPct}% of billed fees received</span>
+                <span>Pending <b className="text-slate-800 font-semibold" data-testid="stat-fees_pending">{stats.fees_pending == null ? "—" : formatMoney(pending)}</b></span>
+              </div>
+            </section>
+          )}
+          <section className="ui-card p-5 flex items-center gap-4">
+            <div className="relative shrink-0">
+              <Ring pct={stats.attendance_today_pct} />
+              <div className="absolute inset-0 grid place-items-center">
+                <span className="font-heading text-lg font-semibold" data-testid="stat-attendance_today_pct">{stats.attendance_today_pct == null ? "—" : `${stats.attendance_today_pct}%`}</span>
+              </div>
             </div>
-          </div>
-          <div className="min-w-0">
-            <div className="font-medium">Present today</div>
-            <p className="text-sm text-slate-500 mt-1">
-              {stats.attendance_today_pct == null ? "Attendance isn't marked yet today." : "Students marked present."}
-            </p>
-            <Link to="/app/attendance" className="inline-flex items-center gap-1 text-sm font-medium text-[#2B4BFF] mt-2 hover:underline">
-              Mark now <ArrowUpRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-        </section>
-
-        {!teacher && <Small icon={GraduationCap} label="Active students" value={n(stats.total_students)} testid="stat-total_students" />}
-        {!parent && !teacher && <Small icon={Users} label="Classes" value={n(stats.total_classes)} testid="stat-total_classes" />}
-        {parent && <Small icon={Clock} label="Fees pending" value={stats.fees_pending == null ? "—" : formatMoney(pending)} testid="stat-parent_pending" tone="amber" />}
-        {!parent && !teacher && <Small icon={UserMinus} label="Students who left" value={n(stats.students_left)} testid="stat-students_left" tone="slate" />}
+            <div className="min-w-0 text-sm"><div className="font-semibold">Present today</div><Link to="/app/attendance" className="text-[#2B4BFF] font-medium hover:underline">{stats.attendance_today_pct == null ? "Mark now" : "Open register"}</Link></div>
+          </section>
+          {parent
+            ? <Small icon={Clock} label="Fees pending" value={stats.fees_pending == null ? "—" : formatMoney(pending)} testid="stat-parent_pending" tone="amber" />
+            : (
+              <section className="ui-card p-5">
+                <div className="text-sm text-slate-500">Active students</div>
+                <div className="font-heading text-3xl font-semibold mt-1 tabular-nums" data-testid="stat-total_students">{n(stats.total_students)}</div>
+                {!teacher && (
+                  <div className="mt-3 text-xs text-slate-500 space-y-0.5">
+                    <div><b className="text-slate-800 font-semibold" data-testid="stat-total_classes">{n(stats.total_classes)}</b> classes</div>
+                    <div><b className="text-slate-800 font-semibold" data-testid="stat-students_left">{n(stats.students_left)}</b> have left</div>
+                  </div>
+                )}
+              </section>
+            )}
+        </div>
       </div>
 
       {!parent && <ProgressBoard />}

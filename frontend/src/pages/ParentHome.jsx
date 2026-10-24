@@ -21,8 +21,7 @@ function Child({ c, report }) {
   return (
     <section className="ui-card p-5 sm:p-6" data-testid={`child-${c.id}`}>
       <div className="flex items-center gap-4">
-        <div className="h-14 w-14 grid place-items-center rounded-2xl text-white text-xl font-heading font-semibold shrink-0"
-          style={{ background: "linear-gradient(135deg,#4A66FF,#2340F0)" }}>{c.first_name[0]}</div>
+        <div className="h-14 w-14 grid place-items-center rounded-full bg-[#0B1020] text-[#E9C46A] text-xl font-heading font-bold shrink-0">{c.first_name[0]}</div>
         <div className="min-w-0 flex-1">
           <h2 className="font-heading text-lg font-semibold truncate">{c.first_name} {c.last_name}</h2>
           <p className="text-sm text-slate-500 truncate">{c.class_name || "No class yet"}{c.roll_number ? ` · Roll ${c.roll_number}` : ""}</p>

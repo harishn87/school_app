@@ -46,7 +46,7 @@ export default function SchoolMonthCalendar({ classId, selected, onPick, refresh
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-heading text-lg font-semibold" data-testid="scal-title">{cursor.toLocaleDateString("en-IN", { month: "long", year: "numeric" })}</h2>
-          <p className="text-xs text-slate-500">{data ? `${data.students} students` : ""}. Click a date to mark or review it.</p>
+          <p className="text-xs text-slate-500">{data ? `${data.students} students` : ""}. Click a date for details.</p>
         </div>
         <div className="flex gap-1">
           <button type="button" className="ui-btn !px-2.5 !py-1.5" onClick={() => shift(-1)} aria-label="Previous month" data-testid="scal-prev"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>

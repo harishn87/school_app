@@ -1,5 +1,7 @@
+import PageHero from "@/components/PageHero";
 import Modal from "@/components/Modal";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
@@ -10,7 +12,11 @@ export default function FeesPage() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
+  const [params, setParams] = useSearchParams();
+  const studentId = params.get("student") || "";
+  const autoOpened = useRef(false);
   const [fees, setFees] = useState([]);
+  const [loaded, setLoaded] = useState(false);
   const [students, setStudents] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -20,23 +26,35 @@ export default function FeesPage() {
     const [{ data: f }, { data: s }] = await Promise.all([api.get("/fees"), api.get("/students")]);
     setFees(f);
     setStudents(s);
+    setLoaded(true);
   };
   useEffect(() => { load(); }, []);
 
   const sMap = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
+  const shown = useMemo(() => (studentId ? fees.filter((f) => f.student_id === studentId) : fees), [fees, studentId]);
   const totals = useMemo(() => {
     let due = 0, paid = 0;
-    for (const f of fees) { due += Number(f.amount || 0); paid += Number(f.paid_amount || 0); }
+    for (const f of shown) { due += Number(f.amount || 0); paid += Number(f.paid_amount || 0); }
     return { due, paid, pending: Math.max(due - paid, 0) };
-  }, [fees]);
+  }, [shown]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ student_id: students[0]?.id || "", term: `Term 1 ${new Date().getFullYear()}`, amount: 0, paid_amount: 0, due_date: "", paid_date: "", note: "" });
+    setForm({ student_id: studentId || students[0]?.id || "", term: `Term 1 ${new Date().getFullYear()}`, amount: 0, paid_amount: 0, due_date: "", paid_date: "", note: "" });
     setShowForm(true);
   };
   const openEdit = (f) => { setEditing(f); setForm({ ...f, note: f.note || "" }); setShowForm(true); };
+
+  // Arriving from a student's row: one fee record opens straight in the edit form, none opens a new record for that student.
+  useEffect(() => {
+    if (!loaded || !studentId || autoOpened.current || !isAdmin || !sMap[studentId]) return;
+    autoOpened.current = true;
+    const mine = fees.filter((f) => f.student_id === studentId);
+    if (mine.length === 1) openEdit(mine[0]);
+    else if (mine.length === 0) openCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded, studentId, fees, sMap, isAdmin]);
 
   const save = async (e) => {
     e.preventDefault();
@@ -57,19 +75,25 @@ export default function FeesPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="fees-page">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Fee management</h1>
-        </div>
-        {isAdmin && (
+      <PageHero title="Fee management" subtitle={isAdmin ? "Term-wise fees for every student: who has paid, who is part paid and who is overdue." : "Your children's fees, what is paid and what is due."}
+        actions={isAdmin && (
           <button onClick={openCreate} data-testid="add-fee-btn" className="ui-btn btn-primary"><Plus className="h-4 w-4" aria-hidden="true" /> New record</button>
-        )}
-      </div>
+        )} />
+
+      {studentId && sMap[studentId] && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#E8ECFF] px-5 py-3 text-sm" data-testid="fees-student-filter">
+          <span>Showing fees for <b>{sMap[studentId].first_name} {sMap[studentId].last_name}</b></span>
+          <span className="flex gap-3">
+            {isAdmin && <button type="button" className="font-medium text-[#2B4BFF] hover:underline" onClick={openCreate} data-testid="add-fee-for-student">Add a fee record</button>}
+            <button type="button" className="font-medium text-[#2B4BFF] hover:underline" onClick={() => setParams({})} data-testid="fees-show-all">Show all students</button>
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <SummaryCard label="Total billed" value={totals.due} color="bg-[#E8ECFF]" />
-        <SummaryCard label="Collected" value={totals.paid} color="bg-[#E6F8EE]" />
-        <SummaryCard label="Pending" value={totals.pending} color="bg-[#FEF3C7]" />
+        <SummaryCard label="Total billed" value={totals.due} color="bg-[#2B4BFF]" />
+        <SummaryCard label="Collected" value={totals.paid} color="bg-emerald-500" />
+        <SummaryCard label="Pending" value={totals.pending} color="bg-[#E9C46A]" />
       </div>
 
       <div className="ui-card overflow-hidden">
@@ -87,10 +111,10 @@ export default function FeesPage() {
               </tr>
             </thead>
             <tbody>
-              {fees.length === 0 && (
+              {shown.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No fee records yet.</td></tr>
               )}
-              {fees.map((f) => (
+              {shown.map((f) => (
                 <tr key={f.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`fee-row-${f.id}`}>
                   <td className="px-4 py-3 font-bold">{sMap[f.student_id] ? `${sMap[f.student_id].first_name} ${sMap[f.student_id].last_name}` : "(deleted)"}</td>
                   <td className="px-4 py-3">{f.term}</td>
@@ -170,9 +194,10 @@ function StatusBadge({ status }) {
 
 function SummaryCard({ label, value, color }) {
   return (
-    <div className={`ui-card p-5 ${color}`}>
-      <div className="text-xs font-medium">{label}</div>
-      <div className="font-heading text-3xl font-semibold tracking-tight mt-1">{formatMoney(value)}</div>
+    <div className="ui-card p-5 flex gap-4">
+      <span className={`w-1.5 rounded-full shrink-0 ${color}`} aria-hidden="true" />
+      <div><div className="text-sm text-slate-500">{label}</div>
+      <div className="font-heading text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">{formatMoney(value)}</div></div>
     </div>
   );
 }

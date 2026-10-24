@@ -1,3 +1,4 @@
+import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Download, FileText, Search, X } from "lucide-react";
@@ -82,10 +83,7 @@ export default function LettersPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-fade-up" data-testid="letters-page">
-      <header>
-        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold">Letters</h1>
-        <p className="text-slate-500 mt-1">Issue bonafide, fee clearance, transfer and character certificates. Each gets a serial number and is saved below.</p>
-      </header>
+      <PageHero title="Letters" subtitle="Issue bonafide, fee clearance, transfer and character certificates. Each gets a serial number and is saved below." />
 
       {incomplete && !profileOpen && (
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 flex flex-wrap items-center gap-3 text-sm text-amber-900" data-testid="letterhead-hint">

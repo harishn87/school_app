@@ -28,11 +28,16 @@ def student_scope(ctx: TenantContext) -> dict:
     return {}
 
 
+def class_teacher_query(user_id: str) -> dict:
+    """Classes where this user is the primary or the secondary teacher."""
+    return {"$or": [{"teacher_id": user_id}, {"secondary_teacher_id": user_id}]}
+
+
 async def teacher_class_ids(ctx: TenantContext) -> List[str]:
     """Classes assigned to this teacher (empty for other roles)."""
     if ctx.role != "teacher":
         return []
-    return [c["id"] async for c in ctx.db.classes.find({"teacher_id": ctx.user["id"]}, {"_id": 0, "id": 1})]
+    return [c["id"] async for c in ctx.db.classes.find(class_teacher_query(ctx.user["id"]), {"_id": 0, "id": 1})]
 
 
 async def scope_for(ctx: TenantContext, class_id: Optional[str] = None) -> dict:
@@ -142,13 +147,14 @@ async def delete_user(user_id: str, ctx: TenantContext = Depends(require_roles("
 # ---------- classes ----------
 @router.get("/classes")
 async def list_classes(ctx: TenantContext = Depends(get_ctx)):
-    query = {"teacher_id": ctx.user["id"]} if ctx.role == "teacher" else {}
+    query = class_teacher_query(ctx.user["id"]) if ctx.role == "teacher" else {}
     return await ctx.db.classes.find(query, {"_id": 0}).sort("name", 1).to_list(1000)
 
 
 @router.post("/classes", status_code=201)
 async def create_class(payload: ClassIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_teacher(ctx, payload.teacher_id)
+    await _check_teacher(ctx, payload.secondary_teacher_id)
     doc = {**payload.model_dump(), "id": new_id(), "created_at": now_iso()}
     await ctx.db.classes.insert_one(dict(doc))
     return doc
@@ -157,6 +163,7 @@ async def create_class(payload: ClassIn, ctx: TenantContext = Depends(require_ro
 @router.put("/classes/{class_id}")
 async def update_class(class_id: str, payload: ClassIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_teacher(ctx, payload.teacher_id)
+    await _check_teacher(ctx, payload.secondary_teacher_id)
     res = await ctx.db.classes.update_one({"id": class_id}, {"$set": payload.model_dump()})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Class not found")
@@ -331,7 +338,7 @@ async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
 
     total_students = await ctx.db.students.count_documents({**scope, "status": "active"})
     total_left = await ctx.db.students.count_documents({**scope, "status": "left"})
-    total_classes = await ctx.db.classes.count_documents({"teacher_id": ctx.user["id"]} if ctx.role == "teacher" else {})
+    total_classes = await ctx.db.classes.count_documents(class_teacher_query(ctx.user["id"]) if ctx.role == "teacher" else {})
 
     total_due = total_collected = 0.0
     async for f in ctx.db.fees.find(fee_q, {"_id": 0, "amount": 1, "paid_amount": 1}):

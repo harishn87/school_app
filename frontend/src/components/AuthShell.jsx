@@ -11,11 +11,10 @@ const POINTS = [
 export function Logo({ dark = false }) {
   return (
     <Link to="/" className="inline-flex items-center gap-3">
-      <div className="h-10 w-10 grid place-items-center rounded-xl text-white"
-        style={{ background: "linear-gradient(135deg,#4A66FF,#2340F0)", boxShadow: "0 8px 20px -6px rgba(43,75,255,.7)" }}>
+      <div className="h-10 w-10 grid place-items-center rounded-lg bg-[#E9C46A] text-[#0B1020]">
         <School className="h-5 w-5" aria-hidden="true" />
       </div>
-      <span className={`font-heading font-semibold text-xl ${dark ? "text-white" : "text-[#0F1530]"}`}>Scholaris</span>
+      <span className={`font-heading font-semibold text-xl ${dark ? "text-white" : "text-[#0B1020]"}`}>Scholaris</span>
     </Link>
   );
 }
@@ -23,14 +22,14 @@ export function Logo({ dark = false }) {
 export function AuthShell({ children, wide = false }) {
   return (
     <div className="min-h-screen grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
-      <aside className="hidden lg:flex surface-midnight text-white flex-col justify-between p-12 xl:p-16">
+      <aside className="hidden lg:flex surface-midnight ruled-light text-white flex-col justify-between p-12 xl:p-16">
         <Logo dark />
         <div>
           <h2 className="font-heading text-4xl xl:text-[44px] font-semibold leading-[1.1] max-w-md">
-            The calm way to run a school.
+            Mark the register. Collect the fees. Tell the parents.
           </h2>
           <p className="mt-4 text-slate-300 max-w-md leading-relaxed">
-            Students, classes, fees and attendance, together in one clean workspace your whole team will enjoy using.
+            Scholaris keeps every class, student, fee and report card in one place, for the principal, the teachers and the parents.
           </p>
           <ul className="mt-10 space-y-4">
             {POINTS.map(({ icon: Icon, text }) => (
@@ -48,8 +47,7 @@ export function AuthShell({ children, wide = false }) {
       <main className="bg-dots flex items-center justify-center p-6 sm:p-10">
         <div className={`w-full ${wide ? "max-w-xl" : "max-w-md"}`}>
           <div className="lg:hidden mb-8 flex justify-center"><Logo /></div>
-          <div className="bg-white rounded-3xl border border-[#E7E9F1] p-8 sm:p-10 animate-fade-up"
-            style={{ boxShadow: "0 30px 60px -30px rgba(15,21,48,.25)" }}>{children}</div>
+          <div className="bg-white rounded-2xl border border-[#E4E6EF] p-8 sm:p-10">{children}</div>
         </div>
       </main>
     </div>
