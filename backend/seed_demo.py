@@ -243,6 +243,38 @@ def main():
     code, data = c.call("POST", "/users", {"name": "Lakshmi Reddy", "email": PARENT_EMAIL, "role": "parent", "password": PARENT_PASSWORD})
     print("Parent login created." if code == 201 else "Parent login already exists." if code == 409 else f"Parent login: HTTP {code} {data}")
 
+    # Admissions history: spread the joining dates over earlier years and add students who left, so the joiners and leavers views have history
+    cur_students = need(c.call("GET", "/students"), "list students")
+    cls_idx = {classes[n]["id"]: i for i, n in enumerate(CLASSES)}
+    redated = 0
+    for s in cur_students:
+        i = cls_idx.get(s.get("class_id"), 0)
+        if s.get("joining_date") == "2026-06-10" and i > 0 and str(s.get("roll_number")) not in ("1", "2"):
+            body = {k: v for k, v in s.items() if k not in ("id", "created_at", "updated_at")}
+            body["joining_date"] = f"{2025 - int(s.get('roll_number') or 0) % 3}-{[6, 6, 7, 8][int(s.get('roll_number') or 0) % 4]:02d}-{rnd.randint(8, 20):02d}"
+            need(c.call("PUT", f"/students/{s['id']}", body), "update joining date")
+            redated += 1
+    if redated:
+        print(f"Joining dates spread over earlier years for {redated} students.")
+    if not any((s.get("notes") or "") == "Sample history" for s in cur_students):
+        class_ids = [classes[n]["id"] for n in CLASSES]
+        leavers = [("2024-25", 5), ("2025-26", 6), ("2026-27", 4)]
+        k = 0
+        for year, n in leavers:
+            y0 = int(year[:4])
+            for j in range(n):
+                first, last = rnd.choice(BOYS + GIRLS), rnd.choice(SURNAMES)
+                left = date(y0 + (1 if j % 3 == 2 else 0), [7, 9, 1, 2, 11, 12][j % 6] if year != "2026-27" else [7, 8, 9, 9][j % 4], 10 + j)
+                if left.month < 4 and left.year == y0:
+                    left = left.replace(year=y0 + 1)
+                if year == "2026-27" and left > date.today():
+                    left = date.today() - timedelta(days=20 + j)
+                joined = date(max(2018, y0 - rnd.randint(0, 3)), 6, 10 + (j % 8))
+                need(c.call("POST", "/students", {"first_name": first, "last_name": last, "gender": "male" if j % 2 == 0 else "female",
+                    "joining_date": joined.isoformat(), "leaving_date": left.isoformat(), "status": "left", "class_id": class_ids[(k * 3) % len(class_ids)],
+                    "guardian_name": f"Mr {last}", "guardian_phone": f"98{rnd.randint(10000000, 99999999)}", "notes": "Sample history"}), "add past student")
+                k += 1
+        print(f"Added {k} students who left in earlier years and this year.")
     # Holidays
     have_h = {h["name"] for h in need(c.call("GET", "/holidays"), "list holidays")}
     for name, d, e in [("Gandhi Jayanti", "2026-10-02", None), ("Dussehra", "2026-10-20", "2026-10-21"), ("Diwali break", "2026-11-08", "2026-11-10"), ("Christmas", "2026-12-25", None)]:

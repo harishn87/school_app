@@ -301,6 +301,88 @@ async def attendance_day(date_str: str = Query(..., alias="date"), class_id: Opt
             "totals": {k: sum(c[k] for c in out) for k in ("total", "present", "late", "absent", "unmarked")}}
 
 
+# ---------- staff performance: how each teacher's classes are doing (principal only) ----------
+WEIGHTS = {"results": 35, "attendance": 15, "register": 20, "marks": 15, "diary": 15}
+
+
+@router.get("/staff/performance")
+async def staff_performance(academic_year: Optional[str] = Query(None, max_length=20),
+                            ctx: TenantContext = Depends(require_roles("admin"))):
+    year = academic_year or current_year()
+    lo, hi = year_bounds(year)
+    classes = await ctx.db.classes.find({}, {"_id": 0}).to_list(1000)
+    students = await ctx.db.students.find({"status": "active"}, {"_id": 0, "id": 1, "class_id": 1}).to_list(5000)
+    by_class: dict = {}
+    for st in students:
+        by_class.setdefault(st["class_id"], []).append(st["id"])
+    sclass = {st["id"]: st["class_id"] for st in students}
+    # per class: attended/total marks, days registered, report percents per term
+    cls_att: dict = {}
+    cls_days: dict = {}
+    school_days = set()
+    async for a in ctx.db.attendance.find({"date": {"$gte": lo, "$lte": hi}}, {"_id": 0, "student_id": 1, "date": 1, "status": 1}):
+        c = sclass.get(a["student_id"])
+        school_days.add(a["date"])
+        if c is None:
+            continue
+        t = cls_att.setdefault(c, [0, 0])
+        t[1] += 1
+        t[0] += a["status"] in ("present", "late")
+        cls_days.setdefault(c, set()).add(a["date"])
+    cls_pct: dict = {}
+    cls_reports: dict = {}
+    terms = set()
+    async for r in ctx.db.reports.find(year_q(year), {"_id": 0, "student_id": 1, "term": 1, "percent": 1}):
+        c = sclass.get(r["student_id"])
+        if c is None:
+            continue
+        terms.add(r["term"])
+        cls_reports[c] = cls_reports.get(c, 0) + 1
+        if r.get("percent") is not None:
+            cls_pct.setdefault(c, []).append((r["term"], r["percent"]))
+    posts: dict = {}
+    async for p in ctx.db.posts.find({"date": {"$gte": lo, "$lte": hi}}, {"_id": 0, "created_by": 1, "date": 1}):
+        posts.setdefault(p.get("created_by"), set()).add(p["date"])
+    teachers = await ctx.db.users.find({"role": "teacher", "active": {"$ne": False}}, {"_id": 0, "id": 1, "name": 1, "email": 1}).to_list(500)
+
+    def avg(vals):
+        return round(sum(vals) / len(vals)) if vals else None
+    out = []
+    for t in teachers:
+        mine = [c for c in classes if t["id"] in (c.get("teacher_id"), c.get("secondary_teacher_id"))]
+        if not mine:
+            continue
+        cids = [c["id"] for c in mine]
+        n_stu = sum(len(by_class.get(c, [])) for c in cids)
+        percents = [p for c in cids for _, p in cls_pct.get(c, [])]
+        ta = [sum(cls_att.get(c, [0, 0])[i] for c in cids) for i in (0, 1)]
+        days = set().union(*(cls_days.get(c, set()) for c in cids))
+        by_term: dict = {}
+        for c in cids:
+            for term, p in cls_pct.get(c, []):
+                by_term.setdefault(term, []).append(p)
+        order = sorted(by_term)
+        trend = (avg(by_term[order[-1]]) - avg(by_term[order[0]])) if len(order) > 1 else None
+        expected = n_stu * len(terms)
+        m = {
+            "results": avg(percents),
+            "attendance": round(ta[0] / ta[1] * 100) if ta[1] else None,
+            "register": min(100, round(len(days) / len(school_days) * 100)) if school_days else None,
+            "marks": min(100, round(sum(cls_reports.get(c, 0) for c in cids) / expected * 100)) if expected else None,
+            "diary": min(100, round(len(posts.get(t["id"], set())) / len(school_days) * 100)) if school_days else None,
+        }
+        got = {k: v for k, v in m.items() if v is not None}
+        overall = round(sum(v * WEIGHTS[k] for k, v in got.items()) / sum(WEIGHTS[k] for k in got)) if got else None
+        out.append({"id": t["id"], "name": t["name"], "email": t.get("email"),
+                    "classes": [{"id": c["id"], "name": f"{c['name']} {c.get('section') or ''}".strip(),
+                                 "role": "Class teacher" if c.get("teacher_id") == t["id"] else "Second teacher"} for c in mine],
+                    "students": n_stu, "metrics": m, "overall": overall, "trend": trend,
+                    "reports": sum(cls_reports.get(c, 0) for c in cids), "diary_days": len(posts.get(t["id"], set()))})
+    out.sort(key=lambda r: (-(r["overall"] if r["overall"] is not None else -1), r["name"]))
+    return {"academic_year": year, "is_current": year == current_year(), "school_days": len(school_days),
+            "weights": WEIGHTS, "terms": sorted(terms), "teachers": out}
+
+
 # ---------- management dashboard: the whole school in one payload ----------
 def _months_back(today: date, n: int) -> list:
     out, y, m = [], today.year, today.month

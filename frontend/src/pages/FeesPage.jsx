@@ -7,6 +7,8 @@ import { formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import FeeInsights from "@/components/FeeInsights";
+import CountUp from "@/components/CountUp";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 export default function FeesPage() {
@@ -15,6 +17,8 @@ export default function FeesPage() {
 
   const [params, setParams] = useSearchParams();
   const studentId = params.get("student") || "";
+  const view = params.get("view") || "";
+  const setView = (v) => { const n = new URLSearchParams(params); if (!v || v === view) n.delete("view"); else n.set("view", v); setParams(n); };
   const autoOpened = useRef(false);
   const ys = useAcademicYears();
   const [year, setYear] = useState("");
@@ -37,12 +41,19 @@ export default function FeesPage() {
 
   const sMap = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
-  const shown = useMemo(() => (studentId ? fees.filter((f) => f.student_id === studentId) : fees), [fees, studentId]);
+  const base = useMemo(() => (studentId ? fees.filter((f) => f.student_id === studentId) : fees), [fees, studentId]);
+  const owed = (f) => Math.max(Number(f.amount || 0) - Number(f.paid_amount || 0), 0);
+  const shown = useMemo(() => {
+    const keep = { pending: (f) => f.status !== "paid" && owed(f) > 0, unpaid: (f) => f.status === "unpaid", partial: (f) => f.status === "partial", paid: (f) => f.status === "paid", collected: (f) => Number(f.paid_amount || 0) > 0 }[view];
+    const rows = keep ? base.filter(keep) : base;
+    return ["pending", "unpaid", "partial"].includes(view) ? [...rows].sort((a, b) => owed(b) - owed(a)) : rows;
+  }, [base, view]);
+  const VIEW_LABEL = { pending: "everything still owed (unpaid and part paid)", unpaid: "unpaid records", partial: "part paid records", paid: "fully paid records", collected: "records with any payment received" };
   const totals = useMemo(() => {
     let due = 0, paid = 0;
-    for (const f of shown) { due += Number(f.amount || 0); paid += Number(f.paid_amount || 0); }
+    for (const f of base) { due += Number(f.amount || 0); paid += Number(f.paid_amount || 0); }
     return { due, paid, pending: Math.max(due - paid, 0) };
-  }, [shown]);
+  }, [base]);
 
   const openCreate = () => {
     setEditing(null);
@@ -98,10 +109,19 @@ export default function FeesPage() {
       <YearSelect chips years={ys.years} current={ys.current} value={activeYear} onChange={setYear} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <SummaryCard label="Total billed" value={totals.due} color="bg-[#2B4BFF]" />
-        <SummaryCard label="Collected" value={totals.paid} color="bg-emerald-500" />
-        <SummaryCard label="Pending" value={totals.pending} color="bg-[#E9C46A]" />
+        <SummaryCard label="Total billed" value={totals.due} color="bg-[#2B4BFF]" active={!view} onClick={() => setView("")} testid="sum-billed" hint="All records" />
+        <SummaryCard label="Collected" value={totals.paid} color="bg-emerald-500" active={view === "collected"} onClick={() => setView("collected")} testid="sum-collected" hint="Who has paid" />
+        <SummaryCard label="Pending" value={totals.pending} color="bg-[#E9C46A]" active={view === "pending"} onClick={() => setView("pending")} testid="sum-pending" hint="All unpaid dues" />
       </div>
+
+      <FeeInsights fees={base} view={view} onPick={setView} />
+
+      {view && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#E8ECFF] px-5 py-3 text-sm" data-testid="fees-view-banner">
+          <span>Showing <b>{shown.length}</b> {VIEW_LABEL[view]}{["pending", "unpaid", "partial"].includes(view) ? ", biggest balance first" : ""}.</span>
+          <button type="button" className="font-medium text-[#2B4BFF] hover:underline" onClick={() => setView("")} data-testid="fees-view-clear">Show all records</button>
+        </div>
+      )}
 
       <div className="ui-card overflow-hidden">
         <div className="overflow-x-auto">
@@ -112,6 +132,7 @@ export default function FeesPage() {
                 <th className="px-4 py-3 font-heading font-semibold">Term</th>
                 <th className="px-4 py-3 font-heading font-semibold">Amount</th>
                 <th className="px-4 py-3 font-heading font-semibold">Paid</th>
+                <th className="px-4 py-3 font-heading font-semibold">Balance</th>
                 <th className="px-4 py-3 font-heading font-semibold">Status</th>
                 <th className="px-4 py-3 font-heading font-semibold">Due</th>
                 {isAdmin && <th className="px-4 py-3"></th>}
@@ -119,7 +140,7 @@ export default function FeesPage() {
             </thead>
             <tbody>
               {shown.length === 0 && (
-                <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-500">No fee records for {activeYear || "this year"}.</td></tr>
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-slate-500">{view ? "Nothing here. No records match this view." : `No fee records for ${activeYear || "this year"}.`}</td></tr>
               )}
               {shown.map((f) => (
                 <tr key={f.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`fee-row-${f.id}`}>
@@ -127,6 +148,7 @@ export default function FeesPage() {
                   <td className="px-4 py-3">{f.term}</td>
                   <td className="px-4 py-3">{formatMoney(f.amount)}</td>
                   <td className="px-4 py-3">{formatMoney(f.paid_amount)}</td>
+                  <td className={`px-4 py-3 font-medium ${owed(f) > 0 ? "text-rose-600" : "text-slate-400"}`}>{formatMoney(owed(f))}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={f.status} />
                   </td>
@@ -199,13 +221,14 @@ function StatusBadge({ status }) {
   );
 }
 
-function SummaryCard({ label, value, color }) {
+function SummaryCard({ label, value, color, active, onClick, testid, hint }) {
   return (
-    <div className="ui-card p-5 flex gap-4">
+    <button type="button" onClick={onClick} aria-pressed={active} data-testid={testid}
+      className={`ui-card hoverable p-5 flex gap-4 text-left w-full ${active ? "ring-2 ring-[#2B4BFF]" : ""}`}>
       <span className={`w-1.5 rounded-full shrink-0 ${color}`} aria-hidden="true" />
-      <div><div className="text-sm text-slate-500">{label}</div>
-      <div className="font-heading text-3xl font-semibold tracking-tight mt-0.5 tabular-nums">{formatMoney(value)}</div></div>
-    </div>
+      <div><div className="text-sm text-slate-500">{label} <span className="text-[11px] text-[#2B4BFF]">· {hint}</span></div>
+      <div className="font-heading text-3xl font-semibold tracking-tight mt-0.5 tabular-nums"><CountUp value={value} format={formatMoney} /></div></div>
+    </button>
   );
 }
 

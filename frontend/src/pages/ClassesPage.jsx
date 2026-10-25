@@ -117,7 +117,7 @@ export default function ClassesPage() {
         const tiles = [["Classes", classes.length, isAdmin && noTeacher ? `${noTeacher} without a class teacher` : "All have a class teacher"], ["Students", students, "Across all classes"],
           ["Attendance", wavg("attendance_pct") == null ? "-" : `${wavg("attendance_pct")}%`, "Last 30 days"], ["Average grade", wavg("grade_avg") == null ? "-" : `${wavg("grade_avg")}%`, "From academics"]];
         return (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4" data-testid="classes-summary">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger" data-testid="classes-summary">
             {tiles.map(([l, v, n]) => (
               <div key={l} className="ui-card p-5">
                 <div className="text-sm text-slate-500">{l}</div>
@@ -160,7 +160,7 @@ export default function ClassesPage() {
         </div>
       )}
 
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 ${mode === "wheel" ? "hidden" : ""}`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 stagger ${mode === "wheel" ? "hidden" : ""}`}>
         {classes.length === 0 && (
           <div className="ui-card p-8 col-span-full text-center text-slate-600">
             No classes yet. {isAdmin && "Click \"New class\" to create one."}

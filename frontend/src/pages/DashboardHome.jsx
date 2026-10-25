@@ -89,7 +89,7 @@ export default function DashboardHome() {
                 </p>
                 <div className="mt-7 flex flex-wrap gap-3">
                   <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">View attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
-                  <Link to="/app/fees" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">View fees</Link>
+                  <Link to="/app/fees?view=pending" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">View fees</Link>
                   {user?.role === "admin" && <Link to="/app/management" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">School dashboard</Link>}
                 </div>
               </>
@@ -97,7 +97,7 @@ export default function DashboardHome() {
           </section>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
           {!teacher && (
             <section className="ui-card p-5 col-span-2" >
               <div className="text-sm text-slate-500">Fees collected</div>

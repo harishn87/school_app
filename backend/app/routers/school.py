@@ -208,6 +208,53 @@ async def create_student(payload: StudentIn, ctx: TenantContext = Depends(requir
     return doc
 
 
+@router.get("/students/movement")
+async def student_movement(academic_year: Optional[str] = Query(None, max_length=20),
+                           ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
+    """Admissions and exits per academic year (April to March), with the lists for the chosen year."""
+    year = academic_year or current_year()
+    cur = current_year()
+    rows = await ctx.db.students.find({**await scope_for(ctx)}, {"_id": 0, "id": 1, "first_name": 1, "last_name": 1, "class_id": 1,
+                                                                "joining_date": 1, "leaving_date": 1, "status": 1}).to_list(10000)
+
+    def ay(d):
+        if not d or len(d) < 7 or not d[:4].isdigit() or not d[5:7].isdigit():
+            return None
+        y = int(d[:4]) if int(d[5:7]) >= 4 else int(d[:4]) - 1
+        return f"{y}-{str(y + 1)[2:]}"
+
+    def month_idx(d):
+        return (int(d[5:7]) - 4) % 12
+    per: dict = {}
+    for r in rows:
+        jy, ly = ay(r.get("joining_date")), ay(r.get("leaving_date")) if r.get("status") == "left" or r.get("leaving_date") else None
+        if jy:
+            e = per.setdefault(jy, {"joined": 0, "left": 0, "jm": [0] * 12, "lm": [0] * 12})
+            e["joined"] += 1
+            e["jm"][month_idx(r["joining_date"])] += 1
+        if ly:
+            e = per.setdefault(ly, {"joined": 0, "left": 0, "jm": [0] * 12, "lm": [0] * 12})
+            e["left"] += 1
+            e["lm"][month_idx(r["leaving_date"])] += 1
+    start = int(cur[:4])
+    first = max(min([int(k[:4]) for k in per] + [start - 2]), start - 4)
+    years = []
+    for y in range(first, start + 1):
+        k = f"{y}-{str(y + 1)[2:]}"
+        e = per.get(k, {"joined": 0, "left": 0, "jm": [0] * 12, "lm": [0] * 12})
+        years.append({"year": k, "joined": e["joined"], "left": e["left"], "net": e["joined"] - e["left"],
+                      "months": [{"month": (4 + i - 1) % 12 + 1, "joined": e["jm"][i], "left": e["lm"][i]} for i in range(12)]})
+
+    def brief(r):
+        return {"id": r["id"], "name": f"{r['first_name']} {r.get('last_name', '')}".strip(), "class_id": r.get("class_id"),
+                "joining_date": r.get("joining_date"), "leaving_date": r.get("leaving_date"), "status": r.get("status")}
+    joined = [brief(r) for r in rows if ay(r.get("joining_date")) == year]
+    left = [brief(r) for r in rows if (r.get("status") == "left" or r.get("leaving_date")) and ay(r.get("leaving_date")) == year]
+    active = sum(1 for r in rows if r.get("status") == "active")
+    return {"current": cur, "academic_year": year, "years": years, "active": active,
+            "joined_list": sorted(joined, key=lambda r: r["joining_date"] or ""), "left_list": sorted(left, key=lambda r: r["leaving_date"] or "")}
+
+
 @router.get("/students/{student_id}")
 async def get_student(student_id: str, ctx: TenantContext = Depends(get_ctx)):
     doc = await ctx.db.students.find_one({"id": student_id, **await scope_for(ctx)}, {"_id": 0})

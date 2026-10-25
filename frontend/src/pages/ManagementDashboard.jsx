@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
 import WagonWheel from "@/components/WagonWheel";
+import AdmissionsExits from "@/components/AdmissionsExits";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 const rank = (n = "") => { const m = n.match(/\d+/); return (/^(pp|nursery|lkg|ukg|kg)/i.test(n.trim()) ? 0 : 100) + (m ? Number(m[0]) : 0); };
@@ -168,6 +169,8 @@ export default function ManagementDashboard() {
         <Card title="Attendance by month" sub="Share of marked student days present." testid="trend"><TrendChart data={d.monthly_attendance} /></Card>
         <Card title="Fees by term" sub="Billed against collected." testid="fees-terms"><FeeBars data={d.fees_by_term} /></Card>
       </div>
+
+      <AdmissionsExits />
 
     </div>
   );

@@ -121,3 +121,18 @@ a.ui-card:hover, .ui-card.hoverable:hover { box-shadow: 0 2px 4px rgba(15,21,48,
 .anim-grow { transform-origin: left center; animation: grow-x .9s cubic-bezier(.2,.8,.2,1) both; }
 .tile-shine { position: relative; overflow: hidden; }
 .tile-shine::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); animation: shine 3.2s ease-in-out 1s infinite; pointer-events: none; }
+
+/* ---- premium motion: rings, rising bars, staggered lists and rows ---- */
+@keyframes ring-draw { from { stroke-dashoffset: var(--ring-from); } }
+@keyframes rise-y { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@keyframes slide-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes pulse-dot { 0% { box-shadow: 0 0 0 0 rgba(43,75,255,.5); } 100% { box-shadow: 0 0 0 10px rgba(43,75,255,0); } }
+.stagger > * { animation: slide-in .5s cubic-bezier(.2,.8,.2,1) backwards; }
+.stagger > *:nth-child(1) { animation-delay: .02s; } .stagger > *:nth-child(2) { animation-delay: .07s; } .stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .17s; } .stagger > *:nth-child(5) { animation-delay: .22s; } .stagger > *:nth-child(6) { animation-delay: .27s; }
+.stagger > *:nth-child(7) { animation-delay: .32s; } .stagger > *:nth-child(8) { animation-delay: .37s; } .stagger > *:nth-child(n+9) { animation-delay: .42s; }
+.ui-card table tbody tr { animation: slide-in .4s ease-out backwards; }
+.ui-card table tbody tr:nth-child(1) { animation-delay: .02s; } .ui-card table tbody tr:nth-child(2) { animation-delay: .05s; } .ui-card table tbody tr:nth-child(3) { animation-delay: .08s; }
+.ui-card table tbody tr:nth-child(4) { animation-delay: .11s; } .ui-card table tbody tr:nth-child(5) { animation-delay: .14s; } .ui-card table tbody tr:nth-child(6) { animation-delay: .17s; }
+.ui-card table tbody tr:nth-child(n+7) { animation-delay: .2s; }
+.nav-active-glow { box-shadow: 0 0 0 1px rgba(233,196,106,.25), 0 10px 24px -12px rgba(43,75,255,.6); }

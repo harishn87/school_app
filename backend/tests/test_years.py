@@ -89,3 +89,42 @@ def test_attendance_year_totals(server, new_client):
     assert x["mom"].get("/api/attendance/year", params={"academic_year": "2024-25"}).json()["school_days"] == 3
     assert x["other"].get("/api/attendance/year", params={"academic_year": "2024-25"}).json()["school_days"] == 0
     assert x["t1"].get("/api/attendance/year").json()["school_days"] == 0
+
+
+def test_staff_performance(server, new_client):
+    x = _setup(server, new_client)
+    sid, cid = x["k5"]["id"], x["c5"]["id"]
+    _batch(x["t1"], cid, sid, "Term 1", 80)
+    x["t1"].post("/api/attendance/batch", json={"date": "2026-10-05", "class_id": cid, "marks": [{"student_id": sid, "status": "present"}]})
+    x["t1"].post("/api/posts", json={"class_id": cid, "kind": "notice", "title": "Hi", "body": "Hello", "date": "2026-10-05"})
+    r = server.get("/api/staff/performance")
+    assert r.status_code == 200
+    d = r.json()
+    assert [t["name"] for t in d["teachers"]] and len(d["teachers"]) == 1       # only teachers with a class
+    t = d["teachers"][0]
+    assert t["students"] == 1 and t["metrics"]["results"] == 80 and t["metrics"]["attendance"] == 100
+    assert t["metrics"]["register"] == 100 and t["metrics"]["marks"] == 100 and t["metrics"]["diary"] == 100
+    assert t["overall"] == 93 and t["classes"][0]["role"] == "Class teacher"
+    assert x["t1"].get("/api/staff/performance").status_code == 403
+    assert x["mom"].get("/api/staff/performance").status_code == 403
+    old = server.get("/api/staff/performance", params={"academic_year": "2024-25"}).json()["teachers"][0]
+    assert old["overall"] is None and old["metrics"]["results"] is None
+
+
+def test_student_movement(server, new_client):
+    x = _setup(server, new_client)
+    cid = x["c5"]["id"]
+    mk = lambda f, j, l=None: server.post("/api/students", json={"first_name": f, "last_name": "Q", "joining_date": j, "leaving_date": l,
+                                                                 "status": "left" if l else "active", "class_id": cid}).json()
+    mk("A", "2025-05-01", "2025-12-01")      # joined and left in 2025-26
+    mk("B", "2025-02-01")                    # joined in 2024-25 (Jan-Mar belongs to the year that began the April before)
+    mk("C", "2026-04-02", "2026-09-01")      # joined and left in 2026-27
+    d = server.get("/api/students/movement").json()
+    by = {y["year"]: y for y in d["years"]}
+    assert by["2025-26"]["joined"] == 3 and by["2025-26"]["left"] == 1       # A plus the two seeded students (June 2025)
+    assert by["2024-25"]["joined"] == 1 and by["2024-25"]["months"][10]["joined"] == 1   # Feb is month index 10
+    assert by["2026-27"]["joined"] == 1 and by["2026-27"]["left"] == 1 and by["2026-27"]["net"] == 0
+    assert [s["name"] for s in d["left_list"]] == ["C Q"] and [s["name"] for s in d["joined_list"]] == ["C Q"]
+    assert [s["name"] for s in server.get("/api/students/movement", params={"academic_year": "2024-25"}).json()["joined_list"]] == ["B Q"]
+    assert x["t1"].get("/api/students/movement").json()["active"] == 2
+    assert x["mom"].get("/api/students/movement").status_code == 403

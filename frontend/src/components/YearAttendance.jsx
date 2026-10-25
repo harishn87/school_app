@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import CountUp from "@/components/CountUp";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -47,7 +48,7 @@ export default function YearAttendance({ classId = "", studentId = "" }) {
           {tiles.map(([k, v, c]) => (
             <div key={k} className="rounded-xl border border-[#E7E9F1] p-3 flex gap-3">
               <span className={`w-1.5 rounded-full shrink-0 ${c}`} aria-hidden="true" />
-              <div><div className="text-xs text-slate-500">{k}</div><div className="font-heading text-2xl font-semibold tabular-nums">{v}</div></div>
+              <div><div className="text-xs text-slate-500">{k}</div><div className="font-heading text-2xl font-semibold tabular-nums">{typeof v === "number" ? <CountUp value={v} /> : v}</div></div>
             </div>
           ))}
         </div>
@@ -63,7 +64,7 @@ export default function YearAttendance({ classId = "", studentId = "" }) {
                 return (
                   <div key={m.month} className="flex-1 flex flex-col items-center h-full" title={`${label(m.month)}: ${m.percent ?? "no data"}${m.percent == null ? "" : "%"} attended · ${m.school_days} school days · ${m.absent} absent`}>
                     <div className="text-[11px] font-semibold tabular-nums text-slate-600 h-4">{m.percent == null ? "" : `${m.percent}%`}</div>
-                    <div className="w-full flex-1 flex flex-col-reverse rounded-md overflow-hidden bg-slate-100 gap-px" data-testid={`ya-bar-${m.month}`}>
+                    <div className="w-full flex-1 flex flex-col-reverse rounded-md overflow-hidden bg-slate-100 gap-px" data-testid={`ya-bar-${m.month}`} style={{ animation: "rise-y .8s cubic-bezier(.2,.8,.2,1) both", transformOrigin: "bottom" }}>
                       <div className="bg-emerald-500" style={{ height: h(m.present) }} />
                       <div className="bg-amber-400" style={{ height: h(m.late) }} />
                       <div className="bg-rose-500" style={{ height: h(m.absent) }} />

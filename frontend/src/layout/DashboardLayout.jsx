@@ -2,7 +2,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import {
   LayoutDashboard, GraduationCap, Users, Wallet, CalendarCheck, LogOut, School, UserCog, CreditCard, KeyRound,
-  AlertTriangle, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart,
+  AlertTriangle, Award, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart,
 } from "lucide-react";
 
 const ALL_NAV = [
@@ -15,6 +15,7 @@ const ALL_NAV = [
   { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", group: "Office", roles: ["admin", "parent"] },
   { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance", group: "Today" },
   { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", group: "Today", roles: ["admin", "teacher"] },
+  { to: "/app/staff", label: "Staff performance", icon: Award, testid: "nav-staff", group: "School", roles: ["admin"] },
   { to: "/app/transport", label: "Transport", icon: Bus, testid: "nav-transport", group: "School", roles: ["admin"] },
   { to: "/app/letters", label: "Letters", icon: FileText, testid: "nav-letters", group: "School", roles: ["admin"] },
   { to: "/app/users", label: "Users", icon: UserCog, testid: "nav-users", group: "Office", roles: ["admin"] },

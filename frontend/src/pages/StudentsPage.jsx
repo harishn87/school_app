@@ -1,10 +1,12 @@
 import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Plus, Search, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import MovementWheel from "@/components/MovementWheel";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 import StudentFormModal from "@/components/StudentFormModal";
 
 export default function StudentsPage() {
@@ -17,6 +19,28 @@ export default function StudentsPage() {
   const [classFilter, setClassFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const move = params.get("move") || "";
+  const ys = useAcademicYears();
+  const yr = params.get("year") || ys.current;
+  const [mv, setMv] = useState(null);
+  const [everyone, setEveryone] = useState([]);
+  const setMove = (m) => {
+    const n = new URLSearchParams(params);
+    if (!m || m === move) n.delete("move"); else n.set("move", m);
+    setParams(n);
+  };
+  const setYr = (y) => {
+    const n = new URLSearchParams(params);
+    if (y && y !== ys.current) n.set("year", y); else n.delete("year");
+    setParams(n);
+  };
+
+  useEffect(() => {
+    if (!canEdit || !yr) return;
+    api.get("/students/movement", { params: { academic_year: yr } }).then((r) => setMv(r.data)).catch(() => setMv(null));
+    api.get("/students").then((r) => setEveryone(r.data)).catch(() => {});
+  }, [canEdit, yr, students.length]);
 
   const load = useCallback(async () => {
     const params = {};
@@ -37,6 +61,17 @@ export default function StudentsPage() {
     return () => clearTimeout(t);
   }, [load]);
 
+  const cy = mv?.years?.find((y) => y.year === yr);
+  const continuing = Math.max((mv?.active || 0) - (mv?.joined_list || []).filter((j) => j.status === "active").length, 0);
+  const moveRows = useMemo(() => {
+    if (!move || !mv) return null;
+    const ids = new Set([...(move !== "left" ? mv.joined_list : []), ...(move !== "joined" ? mv.left_list : [])].map((r) => r.id));
+    const needle = q.trim().toLowerCase();
+    return everyone.filter((s) => ids.has(s.id) && (!classFilter || s.class_id === classFilter)
+      && (!needle || `${s.first_name} ${s.last_name} ${s.roll_number || ""} ${s.guardian_name || ""}`.toLowerCase().includes(needle)));
+  }, [move, mv, everyone, q, classFilter]);
+  const rows = moveRows || students;
+
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes]);
 
   return (
@@ -47,6 +82,32 @@ export default function StudentsPage() {
             <Plus className="h-4 w-4" aria-hidden="true" /> New student
           </button>
         )} />
+
+      {canEdit && mv && cy && (
+        <section className="ui-card p-4 sm:p-5 flex flex-wrap items-center gap-5" data-testid="movement-card">
+          <MovementWheel joined={cy.joined} left={cy.left} continuing={continuing} active={move === "both" ? undefined : move} onSelect={(k) => (k === "continuing" ? setMove("") : setMove(k))} />
+          <div className="min-w-[200px] flex-1 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="font-heading font-semibold text-lg">Joined and left · {yr}</h2>
+              <YearSelect chips years={ys.years} current={ys.current} value={yr} onChange={setYr} id="mv-year" />
+            </div>
+            {[["joined", "Joined", cy.joined, "bg-emerald-500"], ["left", "Left", cy.left, "bg-rose-500"], ["both", "Both lists", new Set([...mv.joined_list, ...mv.left_list].map((r) => r.id)).size, "bg-[#2B4BFF]"]].map(([k, l, v, c]) => (
+              <button key={k} type="button" onClick={() => setMove(k)} aria-pressed={move === k} data-testid={`movement-${k}`}
+                className={`w-full flex items-center justify-between rounded-lg px-3 py-2 text-sm transition hover:bg-[#F1F4FF] ${move === k ? "bg-[#E8ECFF] ring-1 ring-[#2B4BFF]" : "bg-[#F7F8FC]"}`}>
+                <span className="inline-flex items-center gap-2"><i className={`h-2.5 w-2.5 rounded-full ${c}`} />{l}</span><b className="tabular-nums">{v}</b>
+              </button>
+            ))}
+            <p className="text-xs text-slate-500">Click the wheel or a row to list those students below.</p>
+          </div>
+        </section>
+      )}
+
+      {move && moveRows && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#E8ECFF] px-5 py-3 text-sm" data-testid="movement-banner">
+          <span>Showing <b>{moveRows.length}</b> {move === "joined" ? "new joiners" : move === "left" ? "students who left" : "joiners and leavers"} in {yr}.</span>
+          <button type="button" className="font-medium text-[#2B4BFF] hover:underline" onClick={() => setMove("")} data-testid="movement-clear">Show everyone</button>
+        </div>
+      )}
 
       <div className="ui-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="relative md:col-span-2">
@@ -87,12 +148,12 @@ export default function StudentsPage() {
               </tr>
             </thead>
             <tbody data-testid="students-table-body">
-              {students.length === 0 && (
+              {rows.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-slate-500">No students found.</td>
                 </tr>
               )}
-              {students.map((s) => (
+              {rows.map((s) => (
                 <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`student-row-${s.id}`}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
