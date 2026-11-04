@@ -104,6 +104,11 @@ class StudentIn(BaseModel):
         return v.lower() if v else v
 
 
+class ClassSubjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    teacher_id: Optional[str] = None                        # who teaches it; blank means the class teacher
+
+
 class ClassIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     section: Optional[str] = Field(default="", max_length=20)
@@ -112,9 +117,13 @@ class ClassIn(BaseModel):
     attender_name: Optional[str] = Field(default=None, max_length=120)    # class attender / helper
     attender_phone: Optional[str] = Field(default=None, max_length=30)
     academic_year: Optional[str] = Field(default=None, max_length=20)
+    subjects: List[ClassSubjectIn] = Field(default=[], max_length=30)
 
     @model_validator(mode="after")
     def _teachers_differ(self):
+        names = [x.name.strip().lower() for x in self.subjects]
+        if len(set(names)) != len(names):
+            raise ValueError("A subject appears twice")
         if self.secondary_teacher_id and self.secondary_teacher_id == self.teacher_id:
             raise ValueError("The secondary teacher must be a different person from the primary teacher")
         return self
@@ -166,6 +175,7 @@ class PostIn(BaseModel):
     subject: Optional[str] = Field(default=None, max_length=60)
     due_date: Optional[str] = Field(default=None, max_length=10)   # homework only, YYYY-MM-DD
     date: Optional[str] = Field(default=None, max_length=10)       # the school day it is for, YYYY-MM-DD
+    draft: bool = False                                            # saved for later, parents don't see it until published
 
 
 class PostItem(BaseModel):
@@ -179,6 +189,7 @@ class PostBatchIn(BaseModel):
     class_id: str
     kind: Literal["classwork", "homework", "notice"]
     date: Optional[str] = Field(default=None, max_length=10)
+    draft: bool = False
     items: List[PostItem] = Field(min_length=1, max_length=20)
 
 
@@ -259,3 +270,23 @@ class ReportBatchIn(BaseModel):
     term: str = Field(min_length=1, max_length=100)
     academic_year: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
     entries: List[ReportEntryIn] = Field(max_length=300)
+
+
+class ChapterIn(BaseModel):
+    title: str = Field(min_length=1, max_length=150)
+    percent: int = Field(default=0, ge=0, le=100)
+
+
+class SyllabusSubjectIn(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    percent: int = Field(default=0, ge=0, le=100)          # used only when the subject has no chapters
+    chapters: List[ChapterIn] = Field(default=[], max_length=60)
+    note: Optional[str] = Field(default=None, max_length=300)
+
+
+class SyllabusIn(BaseModel):
+    term: str = Field(min_length=1, max_length=100)
+    academic_year: Optional[str] = Field(default=None, pattern=r"^\d{4}-\d{2}$")
+    start_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    end_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+    subjects: List[SyllabusSubjectIn] = Field(max_length=20)

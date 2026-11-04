@@ -222,6 +222,19 @@ def main():
                 added += 1
     print(f"Past-year fee records added: {added}")
 
+    # This year's Term 2 and Term 3 fees, so the term-wise views have more than one term to show
+    have_now = {(f["student_id"], f["term"]) for f in need(c.call("GET", "/fees"), "list this year's fees")}
+    added = 0
+    for n, s in enumerate(all_students):
+        amount = fee_for(fee_idx.get(s["id"], 0))
+        for term, due, paid in (("Term 2", "2026-10-31", [amount, amount, amount // 2, 0][n % 4]), ("Term 3", "2027-01-31", [amount, 0, 0, 0][n % 4])):
+            if (s["id"], term) in have_now:
+                continue
+            need(c.call("POST", "/fees", {"student_id": s["id"], "term": term, "amount": amount, "paid_amount": paid,
+                                         "due_date": due, "paid_date": "2026-10-20" if paid else None}), "add this year's fee")
+            added += 1
+    print(f"This year's Term 2/3 fee records added: {added}")
+
     # Past-year attendance: every school day from mid June to the end of March (Sundays off), one request per day
     att_prop = {s["id"]: rnd.choice([.99, .97, .95, .93, .9, .85, .78]) for s in all_students}
     for year, start, end in (("2024-25", date(2024, 6, 12), date(2025, 3, 28)), ("2025-26", date(2025, 6, 11), date(2026, 3, 28))):
@@ -275,6 +288,38 @@ def main():
                     "guardian_name": f"Mr {last}", "guardian_phone": f"98{rnd.randint(10000000, 99999999)}", "notes": "Sample history"}), "add past student")
                 k += 1
         print(f"Added {k} students who left in earlier years and this year.")
+    # Syllabus coverage: each class teacher saves Term 1 (finished) and Term 2 (running) with a mix of on-track, slightly behind and behind classes
+    def chapter_marks(avg, n=4):
+        left, out = avg * n, []
+        for _ in range(n):
+            v = min(100, left)
+            out.append(int(round(v / 5.0) * 5))
+            left -= v
+        return out
+    t2_start, t2_end = date(2026, 10, 1), date(2026, 12, 31)
+    tgt = 0 if date.today() <= t2_start else 100 if date.today() >= t2_end else round((date.today() - t2_start).days / (t2_end - t2_start).days * 100)
+    gaps = {"PP1": 8, "PP2": 3, "Class 1": -2, "Class 2": -4, "Class 3": -8, "Class 4": -11, "Class 5": -14, "Class 6": -19, "Class 7": -23, "Class 8": 1, "Class 9": -9, "Class 10": -30}
+    made = 0
+    for email, (tname, cls_names) in TEACHERS.items():
+        tc = Client()
+        if tc.call("POST", "/auth/login", {"school_code": A.school, "email": email, "password": TEACHER_PASSWORD})[0] != 200:
+            continue
+        for cn in cls_names:
+            cid = classes[cn]["id"]
+            idx = CLASSES.index(cn)
+            if (tc.call("GET", f"/syllabus?class_id={cid}&term=Term%202")[1] or {}).get("exists"):
+                continue
+            rr = random.Random(f"syl{cn}")
+            for term, a, b, level in (("Term 1", "2026-06-01", "2026-09-30", None), ("Term 2", "2026-10-01", "2026-12-31", max(0, min(100, tgt + gaps.get(cn, 0))))):
+                subs = []
+                for sname in subjects_for(idx):
+                    avg = rr.choice([96, 100, 100, 92]) if level is None else max(0, min(100, level + rr.randint(-8, 8)))
+                    titles = [f"{sname}: Unit {u}" for u in range(1, 5)]
+                    subs.append({"name": sname, "percent": 0, "chapters": [{"title": t, "percent": v} for t, v in zip(titles, chapter_marks(avg))]})
+                need(tc.call("PUT", f"/syllabus/{cid}", {"term": term, "academic_year": "2026-27", "start_date": a, "end_date": b, "subjects": subs}), f"save syllabus {cn} {term}")
+            made += 1
+    print(f"Syllabus saved for {made} classes (Term 1 finished, Term 2 at different paces).")
+
     # Holidays
     have_h = {h["name"] for h in need(c.call("GET", "/holidays"), "list holidays")}
     for name, d, e in [("Gandhi Jayanti", "2026-10-02", None), ("Dussehra", "2026-10-20", "2026-10-21"), ("Diwali break", "2026-11-08", "2026-11-10"), ("Christmas", "2026-12-25", None)]:

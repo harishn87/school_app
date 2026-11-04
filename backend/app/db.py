@@ -100,6 +100,8 @@ async def ensure_tenant_indexes(db) -> None:
         pass
     await db.reports.create_index([("student_id", 1), ("term", 1), ("academic_year", 1)], unique=True)
     await db.reports.create_index("class_id")
+    await db.syllabus.create_index([("class_id", 1), ("term", 1), ("academic_year", 1)], unique=True)
+    await db.syllabus_log.create_index([("class_id", 1), ("term", 1), ("academic_year", 1), ("date", 1)], unique=True)
     await db.holidays.create_index("id", unique=True)
     await db.holidays.create_index("date")
 

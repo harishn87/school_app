@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import SchoolMonthCalendar from "@/components/SchoolMonthCalendar";
 import MonthCalendar from "@/components/MonthCalendar";
 import YearAttendance from "@/components/YearAttendance";
+import TeacherAttendance from "@/components/TeacherAttendance";
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -96,6 +97,8 @@ export default function AttendancePage() {
     }
     return out;
   }, [filtered, marks]);
+
+  if (canMark) return <TeacherAttendance />;
 
   if (isParent) {
     const mine = filtered;

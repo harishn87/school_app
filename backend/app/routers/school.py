@@ -14,7 +14,7 @@ from ..models import (AttendanceBatchIn, ClassIn, FeeIn, ResetPasswordIn, Studen
                       UserUpdateIn)
 from ..plans import limits_for
 from ..security import TenantContext, get_ctx, hash_password, require_roles
-from ..utils import current_year, new_id, now_iso, safe_regex, year_q
+from ..utils import current_year, fee_terms, new_id, norm_term, now_iso, safe_regex, year_q
 
 router = APIRouter(tags=["school"])
 
@@ -145,6 +145,12 @@ async def delete_user(user_id: str, ctx: TenantContext = Depends(require_roles("
 
 
 # ---------- classes ----------
+def _class_body(payload: ClassIn) -> dict:
+    body = payload.model_dump()
+    body["subjects"] = [{"name": x["name"].strip(), "teacher_id": x.get("teacher_id") or None} for x in body["subjects"] if x["name"].strip()]
+    return body
+
+
 @router.get("/classes")
 async def list_classes(ctx: TenantContext = Depends(get_ctx)):
     query = class_teacher_query(ctx.user["id"]) if ctx.role == "teacher" else {}
@@ -155,7 +161,9 @@ async def list_classes(ctx: TenantContext = Depends(get_ctx)):
 async def create_class(payload: ClassIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_teacher(ctx, payload.teacher_id)
     await _check_teacher(ctx, payload.secondary_teacher_id)
-    doc = {**payload.model_dump(), "id": new_id(), "created_at": now_iso()}
+    for x in payload.subjects:
+        await _check_teacher(ctx, x.teacher_id)
+    doc = {**_class_body(payload), "id": new_id(), "created_at": now_iso()}
     await ctx.db.classes.insert_one(dict(doc))
     return doc
 
@@ -164,7 +172,9 @@ async def create_class(payload: ClassIn, ctx: TenantContext = Depends(require_ro
 async def update_class(class_id: str, payload: ClassIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_teacher(ctx, payload.teacher_id)
     await _check_teacher(ctx, payload.secondary_teacher_id)
-    res = await ctx.db.classes.update_one({"id": class_id}, {"$set": payload.model_dump()})
+    for x in payload.subjects:
+        await _check_teacher(ctx, x.teacher_id)
+    res = await ctx.db.classes.update_one({"id": class_id}, {"$set": _class_body(payload)})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Class not found")
     return await ctx.db.classes.find_one({"id": class_id}, {"_id": 0})
@@ -318,6 +328,7 @@ async def _check_student(ctx: TenantContext, student_id: str) -> None:
 async def create_fee(payload: FeeIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_student(ctx, payload.student_id)
     doc = {**payload.model_dump(), "id": new_id(), "created_at": now_iso()}
+    doc["term"] = norm_term(doc["term"])
     doc["academic_year"] = doc.get("academic_year") or current_year()
     doc["status"] = fee_status(doc["amount"], doc["paid_amount"])
     await ctx.db.fees.insert_one(dict(doc))
@@ -328,6 +339,7 @@ async def create_fee(payload: FeeIn, ctx: TenantContext = Depends(require_roles(
 async def update_fee(fee_id: str, payload: FeeIn, ctx: TenantContext = Depends(require_roles("admin"))):
     await _check_student(ctx, payload.student_id)
     updates = payload.model_dump()
+    updates["term"] = norm_term(updates["term"])
     if not updates.get("academic_year"):
         updates.pop("academic_year", None)
     updates["status"] = fee_status(updates["amount"], updates["paid_amount"])
@@ -375,12 +387,16 @@ async def list_attendance(date_str: Optional[str] = Query(None, alias="date"), c
         query["student_id"] = {"$in": ids}
     if date_str:
         query["date"] = date_str
-    if class_id:
-        query["class_id"] = class_id
+    if class_id:    # by the students now in the class, so marks saved without a class id still show
+        in_class = [s["id"] async for s in ctx.db.students.find({"class_id": class_id, **await scope_for(ctx)}, {"_id": 0, "id": 1})]
+        query["student_id"] = {"$in": [i for i in in_class if ids is None or i in ids]}
     if student_id:
         if ids is not None and student_id not in ids:
             return []
-        query["student_id"] = student_id
+        if class_id:
+            query["student_id"]["$in"] = [i for i in query["student_id"]["$in"] if i == student_id]
+        else:
+            query["student_id"] = student_id
     return await ctx.db.attendance.find(query, {"_id": 0}).to_list(10000)
 
 
@@ -396,7 +412,8 @@ async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
     total_classes = await ctx.db.classes.count_documents(class_teacher_query(ctx.user["id"]) if ctx.role == "teacher" else {})
 
     total_due = total_collected = 0.0
-    async for f in ctx.db.fees.find(fee_q, {"_id": 0, "amount": 1, "paid_amount": 1}):
+    fee_docs = await ctx.db.fees.find(fee_q, {"_id": 0, "amount": 1, "paid_amount": 1, "term": 1, "due_date": 1}).to_list(20000)
+    for f in fee_docs:
         total_due += float(f.get("amount", 0))
         total_collected += float(f.get("paid_amount", 0))
 
@@ -409,10 +426,10 @@ async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
     out = {
         "total_students": total_students, "students_left": total_left, "total_classes": total_classes,
         "fees_total_due": total_due, "fees_collected": total_collected,
-        "fees_pending": max(total_due - total_collected, 0),
+        "fees_pending": max(total_due - total_collected, 0), "fees_by_term": fee_terms(fee_docs),
         "attendance_today_pct": pct, "attendance_today_marked": total_marked,
     }
     if ctx.role == "teacher":       # teachers never see fee information
-        for k in ("fees_total_due", "fees_collected", "fees_pending"):
+        for k in ("fees_total_due", "fees_collected", "fees_pending", "fees_by_term"):
             out[k] = None
     return out

@@ -4,7 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { formatMoney } from "@/lib/utils";
 import WagonWheel from "@/components/WagonWheel";
+import SyllabusWheel from "@/components/SyllabusWheel";
+import { useSyllabusSummary } from "@/components/Syllabus";
+import { useLive } from "@/lib/live";
 import AdmissionsExits from "@/components/AdmissionsExits";
+import ExportButton from "@/components/ExportButton";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 const rank = (n = "") => { const m = n.match(/\d+/); return (/^(pp|nursery|lkg|ukg|kg)/i.test(n.trim()) ? 0 : 100) + (m ? Number(m[0]) : 0); };
@@ -53,6 +57,8 @@ function TrendChart({ data }) {
   );
 }
 
+import TermFeeCards from "@/components/TermFees";
+
 function FeeBars({ data }) {
   const [hov, setHov] = useState(null);
   if (!data.length) return <p className="text-sm text-slate-500">No fees recorded yet.</p>;
@@ -92,10 +98,12 @@ export default function ManagementDashboard() {
   const [subjClass, setSubjClass] = useState("");
   const ys = useAcademicYears();
   const [year, setYear] = useState("");
+  const live = useLive(30000);
+  const { data: syl } = useSyllabusSummary(live, year);
   const navigate = useNavigate();
   const classWheelRef = useRef(null);
 
-  useEffect(() => { api.get("/dashboard/school", { params: { academic_year: year || undefined } }).then((r) => setD(r.data)).catch((e) => setErr(errorMessage(e))); }, [year]);
+  useEffect(() => { api.get("/dashboard/school", { params: { academic_year: year || undefined } }).then((r) => setD(r.data)).catch((e) => setErr(errorMessage(e))); }, [year, live]);
 
   const classes = useMemo(() => (d ? [...d.classes].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name)) : []), [d]);
   const wheel = useMemo(() => {
@@ -131,7 +139,8 @@ export default function ManagementDashboard() {
 
   return (
     <div className="space-y-6" data-testid="management-dashboard">
-      <PageHero title="School dashboard" subtitle={current ? `The whole school at a glance, as of ${d.as_of}. Click any wing of a wheel to open the data behind it.` : `The whole school in ${d.academic_year}: every student's marks, fees and attendance for that year.`} />
+      <PageHero title="School dashboard" subtitle={current ? `The whole school at a glance, as of ${d.as_of}. Click any wing of a wheel to open the data behind it.` : `The whole school in ${d.academic_year}: every student's marks, fees and attendance for that year.`}
+        actions={<ExportButton year={year} testid="export-dashboard" />} />
 
       <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} />
 
@@ -167,10 +176,18 @@ export default function ManagementDashboard() {
             hint={subjClass ? "Click a subject to open this class's progress analysis." : "Click a subject to see it class by class."} />
         </Card>
         <Card title="Attendance by month" sub="Share of marked student days present." testid="trend"><TrendChart data={d.monthly_attendance} /></Card>
-        <Card title="Fees by term" sub="Billed against collected." testid="fees-terms"><FeeBars data={d.fees_by_term} /></Card>
+        <Card title="Fees by term" sub="Collected and pending in each term. Click a term to list its records." testid="fees-terms">
+          <TermFeeCards terms={d.fees_by_term} onPick={(t) => navigate(`/app/fees?term=${encodeURIComponent(t)}`)} testid="dash-terms" />
+        </Card>
       </div>
 
       <AdmissionsExits />
+
+      {current && syl && syl.classes.length > 0 && (
+        <SyllabusWheel data={syl} showTeacher testid="mgmt-syllabus" title="Syllabus against target"
+          sub="Each class's syllabus coverage against where the term says it should be today."
+          linkFor={(r) => `/app/syllabus?class=${r.class_id}`} />
+      )}
 
     </div>
   );

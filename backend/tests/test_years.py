@@ -105,6 +105,7 @@ def test_staff_performance(server, new_client):
     assert t["students"] == 1 and t["metrics"]["results"] == 80 and t["metrics"]["attendance"] == 100
     assert t["metrics"]["register"] == 100 and t["metrics"]["marks"] == 100 and t["metrics"]["diary"] == 100
     assert t["overall"] == 93 and t["classes"][0]["role"] == "Class teacher"
+    assert t["metrics"]["syllabus"] is None and t["classes"][0]["syllabus"]["year"]["percent"] is None   # nothing set up yet
     assert x["t1"].get("/api/staff/performance").status_code == 403
     assert x["mom"].get("/api/staff/performance").status_code == 403
     old = server.get("/api/staff/performance", params={"academic_year": "2024-25"}).json()["teachers"][0]

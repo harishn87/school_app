@@ -14,7 +14,10 @@ const METRICS = [
   { key: "register", label: "Register regularity", note: "School days on which the teacher's classes have attendance marked." },
   { key: "marks", label: "Marks entry", note: "Report cards entered for the teacher's students, out of those expected for the terms in use." },
   { key: "diary", label: "Diary activity", note: "School days on which the teacher posted classwork, homework or a notice." },
+  { key: "syllabus", label: "Syllabus coverage", note: "Share of the year's syllabus covered in the subjects this teacher takes (three terms averaged; a term with no syllabus counts as nothing covered). Subjects without a named teacher belong to the class teacher." },
 ];
+const DOT = { green: "bg-emerald-500", amber: "bg-amber-400", red: "bg-rose-500", none: "bg-slate-300" };
+const WORD = { green: "On track", amber: "Slightly behind", red: "Behind", none: "Not set up" };
 const val = (t, k) => (k === "overall" ? t.overall : t.metrics[k]);
 const tone = (v) => (v == null ? "text-slate-400" : v >= 80 ? "text-emerald-600" : v >= 60 ? "text-amber-600" : "text-rose-600");
 const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
@@ -44,7 +47,7 @@ export default function StaffPerformancePage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="staff-performance-page">
-      <PageHero title="Staff performance" subtitle="How each teacher's classes are doing: results, attendance, marks entry and diary. Click a wing of the wheel to see that teacher's detail." />
+      <PageHero title="Staff performance" subtitle="How each teacher's classes are doing: results, attendance, marks entry, diary and syllabus coverage. Click a wing of the wheel to see that teacher's detail." />
       <YearSelect chips years={ys.years} current={ys.current} value={yr} onChange={setYear} id="sp-year" />
 
       {error && <div className="ui-card p-6 text-rose-600">Could not load staff performance.</div>}
@@ -110,6 +113,45 @@ export default function StaffPerformancePage() {
                     </div>
                   );
                 })}
+              </div>
+
+              <div data-testid="sp-syllabus">
+                <div className="flex items-baseline justify-between">
+                  <h4 className="font-heading text-base font-semibold">Syllabus covered, class by class</h4>
+                  <span className="text-[11px] text-slate-500">blue = this teacher&apos;s subjects</span>
+                </div>
+                <div className="mt-2 space-y-2.5">
+                  {sel.classes.map((c) => {
+                    const y = c.syllabus?.year || {}; const st = y.percent == null ? "none" : y.status;
+                    return (
+                      <Link key={c.id} to={`/app/syllabus?class=${c.id}&term=Whole%20year`} className="block rounded-xl border border-[#E8EBF3] p-3 hover:shadow-md hover:border-slate-300 transition" data-testid={`sp-syl-${c.id}`}>
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="font-medium inline-flex items-center gap-2"><i className={`h-2.5 w-2.5 rounded-full ${DOT[st]}`} aria-hidden="true" />{c.name} <span className="text-[11px] font-normal text-slate-400">· {c.role}</span></span>
+                          <span className="tabular-nums"><b className={{ green: "text-emerald-600", amber: "text-amber-600", red: "text-rose-600", none: "text-slate-400" }[st]}>{y.percent == null ? "—" : `${y.percent}%`}</b> <span className="text-[11px] text-slate-500">{WORD[st]}</span></span>
+                        </div>
+                        <div className="relative mt-1.5 h-2.5 rounded-full bg-slate-100">
+                          <div className={`h-full rounded-full ${st === "none" ? "bg-slate-300" : st === "green" ? "bg-emerald-500" : st === "amber" ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${y.percent || 0}%` }} />
+                          {y.target != null && <i className="absolute -top-0.5 h-3.5 w-0.5 bg-slate-900" style={{ left: `${y.target}%` }} aria-hidden="true" />}
+                        </div>
+                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                          {(c.syllabus?.terms || []).map((t) => (
+                            <div key={t.term} className="rounded-lg bg-[#F6F7FB] px-2 py-1.5">
+                              <div className="text-slate-500 inline-flex items-center gap-1.5"><i className={`h-2 w-2 rounded-full ${DOT[t.status]}`} aria-hidden="true" />{t.term}</div>
+                              <div className="font-semibold tabular-nums">{t.percent == null ? "Not set up" : `${t.percent}%`}</div>
+                            </div>
+                          ))}
+                        </div>
+                        {(c.syllabus?.subjects || []).length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`sp-subjects-${c.id}`}>
+                            {c.syllabus.subjects.map((x) => {
+                              const mine = (c.syllabus.mine || []).some((m) => m.name === x.name);
+                              return <span key={x.name} className={`rounded-lg px-2 py-1 text-xs ${mine ? "bg-[#E8ECFF] text-[#2B4BFF] font-medium" : "bg-slate-100 text-slate-600"}`} title={mine ? "Taught by this teacher" : `Taught by ${x.teacher || "another teacher"}`}>{x.name} {x.percent}%{!mine && x.teacher ? <span className="text-slate-400"> · {x.teacher.split(" ")[0]}</span> : null}</span>;
+                            })}
+                          </div>)}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
               <div className="text-xs text-slate-500">{sel.reports} report cards entered · diary posted on {sel.diary_days} {sel.diary_days === 1 ? "day" : "days"}</div>
             </div>

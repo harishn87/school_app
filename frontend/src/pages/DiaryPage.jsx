@@ -2,10 +2,11 @@ import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
-import { CalendarCheck, Plus, Send, X } from "lucide-react";
+import { CalendarCheck, Plus, Save, Send, X } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import PostCard, { KINDS } from "@/components/PostCard";
+import { useLive } from "@/lib/live";
 
 const today = () => new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD in the local time zone
 const blankRow = (due = "") => ({ subject: "", title: "", body: "", due_date: due });
@@ -23,12 +24,14 @@ export default function DiaryPage() {
   const [busy, setBusy] = useState(false);
   const [marked, setMarked] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  const [since, setSince] = useState(null);
+  const live = useLive(30000);
 
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes]);
   const label = (c) => (c ? `${c.name} ${c.section || ""}`.trim() : "");
   // Teachers post to their own classes; admins to any class.
   const postable = useMemo(
-    () => (user?.role === "teacher" ? classes.filter((c) => c.teacher_id === user.id) : classes),
+    () => (user?.role === "teacher" ? classes.filter((c) => c.teacher_id === user.id || c.secondary_teacher_id === user.id) : classes),
     [classes, user]
   );
 
@@ -49,7 +52,13 @@ export default function DiaryPage() {
     } catch (e) { toast.error(errorMessage(e)); }
     setLoaded(true);
   }, [staff, classId, filter]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); }, [load, live]);
+
+  // Opening the diary marks everything as seen; posts that arrived since the last visit get a "New" tag for this visit.
+  useEffect(() => {
+    api.get("/posts/unread").then((r) => { setSince(r.data.since); return api.post("/posts/seen"); })
+      .then(() => window.dispatchEvent(new Event("posts-seen"))).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!staff || !classId) return;
@@ -62,12 +71,13 @@ export default function DiaryPage() {
   const removeRow = (i) => setRows((rs) => rs.filter((_, idx) => idx !== i));
   const switchKind = (k) => { setKind(k); if (k === "notice") setRows((rs) => [rs[0]]); };
 
-  const submit = async (e) => {
-    e.preventDefault();
+  const submit = async (e, draft = false) => {
+    e?.preventDefault();
+    if (draft && !document.getElementById("diary-form")?.reportValidity()) return;
     setBusy(true);
     try {
       await api.post("/posts/batch", {
-        class_id: classId, kind, date: today(),
+        class_id: classId, kind, date: today(), draft,
         items: rows.map((r) => ({
           title: r.title, body: r.body || null,
           subject: kind === "notice" ? null : r.subject || null,
@@ -75,11 +85,15 @@ export default function DiaryPage() {
         })),
       });
       const n = rows.length;
-      toast.success(n === 1 ? `${KINDS[kind].label} posted` : `${n} ${KINDS[kind].label.toLowerCase()} updates posted`);
+      toast.success(draft ? `Saved as draft. Parents can't see it until you post it.` : n === 1 ? `${KINDS[kind].label} saved and sent to parents` : `${n} ${KINDS[kind].label.toLowerCase()} updates saved and sent to parents`);
       setRows([blankRow(kind === "homework" ? rows[0].due_date : "")]);
       load();
     } catch (err) { toast.error(errorMessage(err)); }
     setBusy(false);
+  };
+
+  const publish = async (post) => {
+    try { await api.post(`/posts/${post.id}/publish`); toast.success("Posted. Parents can see it now."); load(); } catch (err) { toast.error(errorMessage(err)); }
   };
 
   const remove = async (post) => {
@@ -130,7 +144,7 @@ export default function DiaryPage() {
             </div>
           </div>
 
-          <form onSubmit={submit} className="ui-card p-4 sm:p-5 space-y-4" data-testid="diary-form">
+          <form id="diary-form" onSubmit={(e) => submit(e, false)} className="ui-card p-4 sm:p-5 space-y-4" data-testid="diary-form">
             <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Post type">
               {Object.entries(KINDS).map(([k, v]) => (
                 <button key={k} type="button" role="tab" aria-selected={kind === k} data-testid={`kind-${k}`} onClick={() => switchKind(k)}
@@ -185,15 +199,20 @@ export default function DiaryPage() {
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="sticky bottom-20 lg:bottom-3 z-10 -mx-2 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E7E9F1] bg-white/95 px-3 py-3 shadow-lg backdrop-blur" data-testid="diary-actions">
               {kind !== "notice" ? (
                 <button type="button" onClick={addRow} data-testid="diary-add-row" className="ui-btn text-sm">
                   <Plus className="h-4 w-4" aria-hidden="true" /> Add another subject
                 </button>
               ) : <span />}
-              <button type="submit" disabled={busy || !classId} data-testid="diary-post-btn" className="ui-btn btn-primary">
-                <Send className="h-4 w-4" aria-hidden="true" /> {busy ? "Posting…" : rows.length > 1 ? `Post ${rows.length} updates to parents` : "Post to parents"}
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={busy || !classId} onClick={() => submit(null, true)} data-testid="diary-draft-btn" className="ui-btn text-sm">
+                  <Save className="h-4 w-4" aria-hidden="true" /> Save draft
+                </button>
+                <button type="submit" disabled={busy || !classId} data-testid="diary-post-btn" className="ui-btn btn-primary">
+                  <Send className="h-4 w-4" aria-hidden="true" /> {busy ? "Saving…" : rows.length > 1 ? `Save & send ${rows.length} updates to parents` : "Save & send to parents"}
+                </button>
+              </div>
             </div>
           </form>
         </>
@@ -220,7 +239,8 @@ export default function DiaryPage() {
             <div className="space-y-3">
               {items.map((p) => (
                 <PostCard key={p.id} post={p} className={label(classMap[p.class_id])} showClass={!staff}
-                  onDelete={staff && canDelete(p) ? remove : undefined} />
+                  onDelete={staff && canDelete(p) ? remove : undefined} onPublish={staff && canDelete(p) ? publish : undefined}
+                  isNew={!!since && p.status !== "draft" && p.created_by !== user?.id && (p.created_at || "") > since} />
               ))}
             </div>
           </section>

@@ -1,21 +1,25 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { api } from "@/lib/api";
+import { useLive } from "@/lib/live";
 import {
   LayoutDashboard, GraduationCap, Users, Wallet, CalendarCheck, LogOut, School, UserCog, CreditCard, KeyRound,
-  AlertTriangle, Award, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart,
+  AlertTriangle, Award, BookOpenCheck, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart,
 } from "lucide-react";
 
 const ALL_NAV = [
   { to: "/app", label: "Overview", icon: LayoutDashboard, end: true, testid: "nav-overview", group: "Today" },
   { to: "/app/management", label: "Dashboard", icon: PieChart, testid: "nav-management", group: "Today", roles: ["admin"] },
-  { to: "/app/diary", label: "Class diary", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary", group: "Today", roles: ["teacher", "parent"] },
+  { to: "/app/diary", label: "Homework & notices", parentLabel: "Updates", icon: NotebookPen, testid: "nav-diary", group: "Today", roles: ["teacher", "parent"] },
   { to: "/app/students", label: "Students", parentLabel: "My children", icon: GraduationCap, testid: "nav-students", group: "School" },
   { to: "/app/classes", label: "Classes", icon: Users, testid: "nav-classes", group: "School", roles: ["admin", "teacher"] },
   { to: "/app/progress", label: "Academics", parentLabel: "Academics", icon: ClipboardList, testid: "nav-progress", group: "School" },
+  { to: "/app/syllabus", label: "Syllabus", parentLabel: "Syllabus", icon: BookOpenCheck, testid: "nav-syllabus", group: "School" },
   { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", group: "Office", roles: ["admin", "parent"] },
   { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance", group: "Today" },
   { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", group: "Today", roles: ["admin", "teacher"] },
-  { to: "/app/staff", label: "Staff performance", icon: Award, testid: "nav-staff", group: "School", roles: ["admin"] },
+  { to: "/app/staff", label: "Staff performance", icon: Award, BookOpenCheck, testid: "nav-staff", group: "School", roles: ["admin"] },
   { to: "/app/transport", label: "Transport", icon: Bus, testid: "nav-transport", group: "School", roles: ["admin"] },
   { to: "/app/letters", label: "Letters", icon: FileText, testid: "nav-letters", group: "School", roles: ["admin"] },
   { to: "/app/users", label: "Users", icon: UserCog, testid: "nav-users", group: "Office", roles: ["admin"] },
@@ -53,6 +57,16 @@ function SubscriptionBanner({ school, isAdmin }) {
 }
 
 export default function DashboardLayout() {
+  const live = useLive(30000);
+  const [unread, setUnread] = useState(0);
+  const roleNow = useAuth().user?.role;
+  useEffect(() => {
+    if (roleNow !== "parent" && roleNow !== "teacher") return undefined;
+    const load = () => api.get("/posts/unread").then((r) => setUnread(r.data.unread)).catch(() => {});
+    load();
+    window.addEventListener("posts-seen", load);
+    return () => window.removeEventListener("posts-seen", load);
+  }, [roleNow, live]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const parent = user?.role === "parent";
@@ -101,6 +115,7 @@ export default function DashboardLayout() {
                         {isActive && <span className="absolute left-0 top-2 bottom-2 w-[3px] rounded-r bg-[#E9C46A]" aria-hidden="true" />}
                         <n.icon className={`h-[18px] w-[18px] ${isActive ? "text-[#8EA2FF]" : ""}`} aria-hidden="true" />
                         {n.label}
+                        {n.testid === "nav-diary" && unread > 0 && <span className="ml-auto rounded-full bg-[#E9C46A] px-2 py-0.5 text-[11px] font-bold text-[#0B1020]" data-testid="diary-unread" aria-label={`${unread} new`}>{unread}</span>}
                       </>)}
                     </NavLink>
                   ))}
@@ -156,7 +171,8 @@ export default function DashboardLayout() {
             <NavLink key={n.to} to={n.to} end={n.end}
               className={({ isActive }) =>
                 `flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium ${isActive ? "text-[#2B4BFF]" : "text-slate-500"}`}>
-              <n.icon className="h-[18px] w-[18px]" aria-hidden="true" />
+              <span className="relative"><n.icon className="h-[18px] w-[18px]" aria-hidden="true" />
+                {n.testid === "nav-diary" && unread > 0 && <span className="absolute -right-2 -top-1.5 rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white">{unread}</span>}</span>
               {n.label}
             </NavLink>
           ))}

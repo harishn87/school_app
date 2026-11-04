@@ -8,8 +8,9 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .demo_syllabus import seed_demo_syllabus
 from .db import ensure_platform_indexes, ensure_tenant_indexes, get_client, platform_db, tenant_db
-from .routers import auth, billing, certificates, diary, insights, platform, reports, school, signup, transport
+from .routers import auth, billing, certificates, diary, export, insights, platform, reports, school, signup, syllabus, transport
 from .security import hash_password, verify_password
 from .tenants import create_school
 from .utils import new_id, now_iso
@@ -40,6 +41,13 @@ async def _seed() -> None:
         await create_school(name="Demo School", slug="demo", admin_name="Demo Admin",
                             admin_email="admin@school.com", password="admin123")
         log.info("Seeded demo school: code 'demo', admin@school.com / admin123")
+
+    if s.seed_demo:
+        demo = await platform_db().schools.find_one({"slug": "demo"}, {"_id": 0, "db_name": 1})
+        if demo:
+            made = await seed_demo_syllabus(tenant_db(demo["db_name"]))
+            if made:
+                log.info("Added sample syllabus for %s demo classes", made)
 
     # Make sure every school's database has its indexes (cheap if they already exist).
     async for sch in platform_db().schools.find({}, {"_id": 0, "db_name": 1}):
@@ -134,7 +142,7 @@ def create_app() -> FastAPI:
     async def root():
         return {"message": "Scholaris API"}
 
-    for r in (auth.router, signup.router, school.router, diary.router, insights.router, reports.router, certificates.router, transport.router, billing.router, platform.router):
+    for r in (auth.router, signup.router, school.router, diary.router, insights.router, export.router, reports.router, syllabus.router, certificates.router, transport.router, billing.router, platform.router):
         api.include_router(r)
     app.include_router(api)
     _mount_frontend(app)

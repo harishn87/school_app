@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
+import { SyllabusBoard, useSyllabusSummary } from "@/components/Syllabus";
 import { Link } from "react-router-dom";
 import { ArrowUpRight, Bus, CalendarCheck, Phone, Wallet } from "lucide-react";
 import { api } from "@/lib/api";
+import { useLive } from "@/lib/live";
 import { useAuth } from "@/context/AuthContext";
 import { fmtTime, formatDate, formatMoney } from "@/lib/utils";
 import PostCard from "@/components/PostCard";
 import MonthCalendar from "@/components/MonthCalendar";
 import ReportCard from "@/components/ReportCard";
+import TermFeeCards from "@/components/TermFees";
 
 const STATUS = {
   present: ["Present today", "bg-emerald-50 text-emerald-700"],
@@ -45,6 +48,13 @@ function Child({ c, report }) {
           </div>
         </Link>
       </div>
+
+      {c.fees.by_term?.length > 0 && (
+        <div className="mt-4" data-testid={`child-fee-terms-${c.id}`}>
+          <div className="text-sm font-medium text-slate-700 mb-2">Fees by term</div>
+          <TermFeeCards mine terms={c.fees.by_term} testid={`pterms-${c.id}`} />
+        </div>
+      )}
 
       {report && (
         <div className="mt-3" data-testid={`latest-report-${c.id}`}>
@@ -87,12 +97,14 @@ export default function ParentHome() {
   const [data, setData] = useState(null);
   const [classes, setClasses] = useState({});
   const [reports, setReports] = useState([]);
+  const live = useLive(30000);
+  const { data: syl } = useSyllabusSummary(live);
 
   useEffect(() => {
     api.get("/parent/overview").then((r) => setData(r.data)).catch(() => setData({ children: [], posts: [] }));
     api.get("/reports").then((r) => setReports(r.data)).catch(() => {});
     api.get("/classes").then((r) => setClasses(Object.fromEntries(r.data.map((c) => [c.id, `${c.name} ${c.section || ""}`.trim()])))).catch(() => {});
-  }, []);
+  }, [live]);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-up" data-testid="parent-home">
@@ -107,6 +119,12 @@ export default function ParentHome() {
         </div>
       )}
       {data?.children.map((c) => <Child key={c.id} c={c} report={[...reports.filter((r) => r.student_id === c.id)].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0]} />)}
+
+      {data && data.children.length > 0 && syl && syl.classes.length > 0 && (
+        <SyllabusBoard data={syl} testid="parent-syllabus" title="Syllabus progress"
+          sub="How much of this term's syllabus your child's class has covered, against where the term should be today."
+          linkFor={(r) => `/app/syllabus?class=${r.class_id}`} />
+      )}
 
       {data && data.children.length > 0 && (
         <section>

@@ -131,7 +131,7 @@ def test_school_dashboard(server, new_client):
     assert r["today"] == {"present": 1, "late": 0, "absent": 1, "unmarked": 0, "total": 2}
     row = next(s for s in r["students"] if s["id"] == x["k5"]["id"])
     assert row["fees_pending"] == 600 and row["grade_avg"] == 80 and row["teacher"] == "Teacher" and row["class_name"] == "Grade 5 A"
-    assert r["fees_by_term"] == [{"term": "Term 1", "billed": 1000.0, "collected": 400.0}] and r["subjects"][0]["subject"] == "Maths"
+    assert [(t["term"], t["billed"], t["collected"], t["pending"], t["percent"]) for t in r["fees_by_term"]] == [("Term 1", 1000.0, 400.0, 600.0, 40)] and r["subjects"][0]["subject"] == "Maths"
     assert len(r["monthly_attendance"]) == 6 and r["monthly_attendance"][-1]["pct"] == 50
     assert r["subjects_by_class"][x["c5"]["id"]] == {"Maths": 80}
     for who in ("t1", "mom"):

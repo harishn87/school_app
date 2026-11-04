@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import WagonWheel from "@/components/WagonWheel";
+import ClassSyllabusRing from "@/components/ClassSyllabusRing";
 
 const pctOf = (m) => (m.max_score ? Math.round((m.score / m.max_score) * 100) : null);
 
@@ -104,7 +105,7 @@ function Tile({ label, value, note, testid }) {
   );
 }
 
-function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm, canEnter }) {
+function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm, canEnter, classId, year }) {
   const [subject, setSubject] = useState(null);
   const byStudent = Object.fromEntries(termReports.map((r) => [r.student_id, r]));
   const subjPct = (r) => { const m = (r.marks || []).find((x) => x.subject === subject && x.score != null); return m ? pctOf(m) : null; };
@@ -142,7 +143,7 @@ function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm
         No marks have been entered for {term} yet.{canEnter ? "" : " The class teacher enters them, and this page updates by itself."}
         {trend.length > 0 && <div className="mt-2 text-sm">Other terms with marks: {trend.map((x) => `${x.t} (${x.v}%)`).join(", ")}.</div>}
       </div>
-      <div className="grid xl:grid-cols-2 gap-6 items-start">{students.length >= 3 && StudentWheelCard}{TermsCard}</div>
+      <div className="grid xl:grid-cols-2 gap-6 items-start">{students.length >= 3 && StudentWheelCard}{TermsCard}<ClassSyllabusRing classId={classId} term={term} year={year} /></div>
     </div>
   );
   return (
@@ -165,6 +166,7 @@ function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6 items-start">
+        <div className="space-y-6">
           <div className="ui-card p-5" data-testid="ca-dist">
             <h3 className="font-heading text-lg font-semibold">How the class is spread</h3>
             <ul className="mt-3 space-y-2">
@@ -177,7 +179,9 @@ function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm
               ))}
             </ul>
           </div>
-          {TermsCard}
+          <ClassSyllabusRing classId={classId} term={term} year={year} />
+        </div>
+        {TermsCard}
       </div>
 
       <div className="ui-card overflow-hidden">
@@ -292,7 +296,7 @@ export function StaffAnalysis({ classId, students, term, onTerm, canEnter, lead,
         <div className="mt-2 text-right text-xs text-slate-500" data-testid="analysis-updated">{updated ? `Updated ${updated.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}. Refreshes by itself.` : "Loading"}</div>
       </div>
 
-      {!sid && <ClassAnalysis students={students} termReports={termReports} term={term} allReports={allReports} onPick={setSid} onTerm={onTerm} canEnter={canEnter} />}
+      {!sid && <ClassAnalysis classId={classId} year={year} students={students} termReports={termReports} term={term} allReports={allReports} onPick={setSid} onTerm={onTerm} canEnter={canEnter} />}
       {sid && (
         <>
           <button type="button" className="text-sm font-medium text-[#2B4BFF] hover:underline" onClick={() => setSid("")} data-testid="analysis-back">Back to whole class</button>

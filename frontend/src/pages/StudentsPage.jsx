@@ -1,6 +1,6 @@
 import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/api";
 import { Plus, Search, Eye } from "lucide-react";
 import { toast } from "sonner";
@@ -11,6 +11,7 @@ import StudentFormModal from "@/components/StudentFormModal";
 
 export default function StudentsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const canEdit = user?.role === "admin" || user?.role === "teacher";
 
   const [students, setStudents] = useState([]);
@@ -154,7 +155,7 @@ export default function StudentsPage() {
                 </tr>
               )}
               {rows.map((s) => (
-                <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`student-row-${s.id}`}>
+                <tr key={s.id} className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer" data-testid={`student-row-${s.id}`} onClick={(e) => { if (!e.target.closest("a,button")) navigate(`/app/students/${s.id}`); }}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {s.photo_base64 ? (
@@ -165,7 +166,7 @@ export default function StudentsPage() {
                         </div>
                       )}
                       <div>
-                        <div className="font-bold">{s.first_name} {s.last_name}</div>
+                        <Link to={`/app/students/${s.id}`} className="font-bold hover:text-[#2B4BFF] hover:underline">{s.first_name} {s.last_name}</Link>
                         <div className="text-xs text-slate-500">Roll {s.roll_number || "—"}</div>
                       </div>
                     </div>

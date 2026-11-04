@@ -1,10 +1,15 @@
+import ExportButton from "@/components/ExportButton";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { api } from "@/lib/api";
 import { GraduationCap, Users, Wallet, CalendarCheck, Clock, UserMinus, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useLive } from "@/lib/live";
 import { formatMoney } from "@/lib/utils";
+import TermFeeCards from "@/components/TermFees";
 import ProgressBoard from "@/components/ProgressBoard";
+import SyllabusWheel from "@/components/SyllabusWheel";
+import { useSyllabusSummary } from "@/components/Syllabus";
 
 function Ring({ pct }) {
   const r = 52, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0));
@@ -30,8 +35,11 @@ function Small({ icon: Icon, label, value, testid, tone = "blue" }) {
 
 export default function DashboardHome() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({});
   const [loaded, setLoaded] = useState(false);
+  const live = useLive(30000);
+  const { data: syl } = useSyllabusSummary(live);
 
   useEffect(() => {
     (async () => {
@@ -41,7 +49,7 @@ export default function DashboardHome() {
       } catch (_e) { /* ignore */ }
       setLoaded(true);
     })();
-  }, []);
+  }, [live]);
 
   const parent = user?.role === "parent";
   const teacher = user?.role === "teacher";
@@ -91,6 +99,7 @@ export default function DashboardHome() {
                   <Link to="/app/attendance" className="inline-flex items-center gap-1.5 rounded-lg bg-[#E9C46A] text-[#0B1020] font-semibold text-sm px-4 py-2.5 hover:bg-[#F2D283]">View attendance <ArrowUpRight className="h-4 w-4" aria-hidden="true" /></Link>
                   <Link to="/app/fees?view=pending" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">View fees</Link>
                   {user?.role === "admin" && <Link to="/app/management" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5">School dashboard</Link>}
+                  {user?.role === "admin" && <ExportButton testid="export-overview" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 hover:bg-white/20 font-semibold text-sm px-4 py-2.5 disabled:opacity-60" />}
                 </div>
               </>
             )}
@@ -135,7 +144,23 @@ export default function DashboardHome() {
         </div>
       </div>
 
+      {!teacher && !parent && stats.fees_by_term?.length > 0 && (
+        <section className="ui-card p-5" data-testid="overview-fees-terms">
+          <h2 className="font-heading font-semibold">Fees by term</h2>
+          <p className="text-sm text-slate-500 mb-4">Collected and still pending in each term. Click a term to see its records.</p>
+          <TermFeeCards terms={stats.fees_by_term} onPick={(t) => navigate(`/app/fees?term=${encodeURIComponent(t)}`)} testid="overview-terms" />
+        </section>
+      )}
+
       {!parent && <ProgressBoard />}
+
+      {!parent && syl && syl.classes.length > 0 && (
+        <SyllabusWheel data={syl} showTeacher={!teacher} testid="syllabus-board"
+          title={teacher ? "Syllabus for your classes" : "Syllabus progress across classes"}
+          sub={teacher ? "Update each class every day. Red and amber mean the class is behind where the term should be today." : "Syllabus coverage per class against where the term says it should be today."}
+          linkFor={(r) => `/app/syllabus?class=${r.class_id}`} />
+      )}
+
 
       {user?.role === "admin" && loaded && !stats.total_students && (
         <div className="ui-card p-7">

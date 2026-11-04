@@ -14,29 +14,18 @@ export function useAcademicYears() {
   return info;
 }
 
-/** A compact year picker. Always shown, so it is clear where earlier years will appear. */
-export default function YearSelect({ years, current, value, onChange, id = "year-select", chips = false }) {
+/** Year picker as a dropdown list, newest first, defaulting to the current year. (`chips` is accepted but no longer changes the look.) */
+export default function YearSelect({ years, current, value, onChange, id = "year-select", label = "Academic year", className = "" }) {
   if (!years || years.length < 1) return null;
   const v = value || current;
-  if (chips) {
-    return (
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Academic year" data-testid="year-chips">
-        {years.map((y) => (
-          <button key={y} type="button" onClick={() => onChange(y)} aria-pressed={y === v} data-testid={`year-${y}`}
-            className={`pill px-3 py-1.5 ${y === v ? "bg-[#2B4BFF] text-white" : "bg-[#F1F4FF] text-slate-700 hover:bg-[#E8ECFF]"}`}>
-            {y}{y === current ? " (this year)" : ""}
-          </button>
-        ))}
-        {years.length < 2 && <span className="text-xs text-slate-500" data-testid="year-hint">Earlier years appear here once their data is added.</span>}
-      </div>
-    );
-  }
+  const list = years.includes(v) ? years : [v, ...years];
   return (
-    <div>
-      <label className="field-label" htmlFor={id}>Year</label>
-      <select id={id} className="ui-input" value={v} onChange={(e) => onChange(e.target.value)} data-testid={id}>
-        {years.map((y) => <option key={y} value={y}>{y}{y === current ? " (this year)" : ""}</option>)}
+    <div className={`inline-flex flex-col ${className}`} data-testid="year-chips">
+      <label className="field-label" htmlFor={id}>{label}</label>
+      <select id={id} className="ui-input mt-1 min-w-[200px]" value={v} onChange={(e) => onChange(e.target.value)} data-testid={id}>
+        {list.map((y) => <option key={y} value={y}>{y}{y === current ? " (this year)" : ""}</option>)}
       </select>
+      {years.length < 2 && <span className="mt-1 text-xs text-slate-500" data-testid="year-hint">Earlier years appear here once their data is added.</span>}
     </div>
   );
 }

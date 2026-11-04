@@ -9,6 +9,8 @@ import { Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import FeeInsights from "@/components/FeeInsights";
 import CountUp from "@/components/CountUp";
+import { useLive } from "@/lib/live";
+import TermFeeCards, { normTerm, termRows } from "@/components/TermFees";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 export default function FeesPage() {
@@ -18,11 +20,14 @@ export default function FeesPage() {
   const [params, setParams] = useSearchParams();
   const studentId = params.get("student") || "";
   const view = params.get("view") || "";
+  const term = params.get("term") || "";
+  const setTerm = (t) => { const n = new URLSearchParams(params); if (!t || t === term) n.delete("term"); else n.set("term", t); setParams(n); };
   const setView = (v) => { const n = new URLSearchParams(params); if (!v || v === view) n.delete("view"); else n.set("view", v); setParams(n); };
   const autoOpened = useRef(false);
   const ys = useAcademicYears();
   const [year, setYear] = useState("");
   const activeYear = year || ys.current;
+  const live = useLive(30000);
   const [fees, setFees] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [students, setStudents] = useState([]);
@@ -37,11 +42,13 @@ export default function FeesPage() {
     setLoaded(true);
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { if (ys.loaded) load(); }, [activeYear, ys.loaded]);
+  useEffect(() => { if (ys.loaded) load(); }, [activeYear, ys.loaded, live]);
 
   const sMap = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
-  const base = useMemo(() => (studentId ? fees.filter((f) => f.student_id === studentId) : fees), [fees, studentId]);
+  const forStudent = useMemo(() => (studentId ? fees.filter((f) => f.student_id === studentId) : fees), [fees, studentId]);
+  const terms = useMemo(() => termRows(forStudent), [forStudent]);
+  const base = useMemo(() => (term ? forStudent.filter((f) => normTerm(f.term) === term) : forStudent), [forStudent, term]);
   const owed = (f) => Math.max(Number(f.amount || 0) - Number(f.paid_amount || 0), 0);
   const shown = useMemo(() => {
     const keep = { pending: (f) => f.status !== "paid" && owed(f) > 0, unpaid: (f) => f.status === "unpaid", partial: (f) => f.status === "partial", paid: (f) => f.status === "paid", collected: (f) => Number(f.paid_amount || 0) > 0 }[view];
@@ -57,7 +64,7 @@ export default function FeesPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ student_id: studentId || students[0]?.id || "", term: `Term 1 ${new Date().getFullYear()}`, amount: 0, paid_amount: 0, due_date: "", paid_date: "", note: "" });
+    setForm({ student_id: studentId || students[0]?.id || "", term: "Term 1", amount: 0, paid_amount: 0, due_date: "", paid_date: "", note: "" });
     setShowForm(true);
   };
   const openEdit = (f) => { setEditing(f); setForm({ ...f, note: f.note || "" }); setShowForm(true); };
@@ -114,6 +121,24 @@ export default function FeesPage() {
         <SummaryCard label="Pending" value={totals.pending} color="bg-[#E9C46A]" active={view === "pending"} onClick={() => setView("pending")} testid="sum-pending" hint="All unpaid dues" />
       </div>
 
+      <section aria-label="Fees by term" data-testid="fees-by-term">
+        <h2 className="font-heading font-semibold mb-3">{isAdmin ? "Collected by term" : "Paid and pending by term"}</h2>
+        {!isAdmin && students.length > 1 && !studentId ? (
+          <div className="space-y-5">
+            {students.map((s) => {
+              const rows = termRows(fees.filter((f) => f.student_id === s.id));
+              return <div key={s.id} data-testid={`child-terms-${s.id}`}><div className="text-sm font-medium text-slate-700 mb-2">{s.first_name} {s.last_name}</div><TermFeeCards mine terms={rows} testid={`terms-${s.id}`} /></div>;
+            })}
+          </div>
+        ) : <TermFeeCards mine={!isAdmin} terms={terms} active={term} onPick={setTerm} />}
+        {term && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#E8ECFF] px-5 py-3 text-sm" data-testid="fees-term-banner">
+            <span>Showing <b>{term}</b> only.</span>
+            <button type="button" className="font-medium text-[#2B4BFF] hover:underline" onClick={() => setTerm("")} data-testid="fees-term-clear">All terms</button>
+          </div>
+        )}
+      </section>
+
       <FeeInsights fees={base} view={view} onPick={setView} />
 
       {view && (
@@ -145,7 +170,7 @@ export default function FeesPage() {
               {shown.map((f) => (
                 <tr key={f.id} className="border-b border-slate-100 hover:bg-slate-50" data-testid={`fee-row-${f.id}`}>
                   <td className="px-4 py-3 font-bold">{sMap[f.student_id] ? `${sMap[f.student_id].first_name} ${sMap[f.student_id].last_name}` : "(deleted)"}</td>
-                  <td className="px-4 py-3">{f.term}</td>
+                  <td className="px-4 py-3">{normTerm(f.term)}</td>
                   <td className="px-4 py-3">{formatMoney(f.amount)}</td>
                   <td className="px-4 py-3">{formatMoney(f.paid_amount)}</td>
                   <td className={`px-4 py-3 font-medium ${owed(f) > 0 ? "text-rose-600" : "text-slate-400"}`}>{formatMoney(owed(f))}</td>
@@ -182,7 +207,9 @@ export default function FeesPage() {
               </select>
             </Field>
             <Field label="Term *">
-              <input required className="ui-input" value={form.term} onChange={(e) => setForm({ ...form, term: e.target.value })} />
+              <select required className="ui-input" value={normTerm(form.term)} onChange={(e) => setForm({ ...form, term: e.target.value })} data-testid="fee-term-select">
+                  {["Term 1", "Term 2", "Term 3", "Annual"].map((t) => <option key={t}>{t}</option>)}
+                </select>
             </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Amount">

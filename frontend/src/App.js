@@ -24,6 +24,7 @@ import DayAttendancePage from "@/pages/DayAttendancePage";
 import SubjectPage from "@/pages/SubjectPage";
 import TransportPage from "@/pages/TransportPage";
 import StaffPerformancePage from "@/pages/StaffPerformancePage";
+import SyllabusPage from "@/pages/SyllabusPage";
 import ParentHome from "@/pages/ParentHome";
 import PlatformLoginPage from "@/pages/platform/PlatformLoginPage";
 import PlatformPage from "@/pages/platform/PlatformPage";
@@ -83,6 +84,7 @@ export default function App() {
             <Route path="attendance/day/:date" element={<RoleOnly roles={["admin", "teacher"]}><DayAttendancePage /></RoleOnly>} />
             <Route path="progress" element={<ProgressPage />} />
             <Route path="progress/subject/:sid/:subject" element={<SubjectPage />} />
+            <Route path="syllabus" element={<SyllabusPage />} />
             <Route path="staff" element={<RoleOnly roles={["admin"]}><StaffPerformancePage /></RoleOnly>} />
             <Route path="management" element={<RoleOnly roles={["admin"]}><ManagementDashboard /></RoleOnly>} />
             <Route path="holidays" element={<RoleOnly roles={["admin", "teacher"]}><HolidaysPage /></RoleOnly>} />

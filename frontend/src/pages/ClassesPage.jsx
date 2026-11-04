@@ -7,6 +7,7 @@ import WagonWheel from "@/components/WagonWheel";
 import { Plus, Pencil, Trash2, Phone, UserRound, LayoutGrid, PieChart } from "lucide-react";
 import { formatMoney } from "@/lib/utils";
 import { toast } from "sonner";
+import { useAcademicYears } from "@/components/YearSelect";
 import { useAuth } from "@/context/AuthContext";
 
 // PP1, PP2, then Class 1 ... Class 10 in school order (plain alphabetical would put Class 10 before Class 2)
@@ -37,8 +38,12 @@ function MiniRing({ value, label, warn, testid }) {
   );
 }
 
+// "2026-27" -> "2027-28", so a class can be set up for the coming year
+const nextYear = (y) => { const m = /^(\d{4})-(\d{2})$/.exec(y || ""); return m ? `${+m[1] + 1}-${String((+m[2] + 1) % 100).padStart(2, "0")}` : ""; };
+
 export default function ClassesPage() {
   const navigate = useNavigate();
+  const ys = useAcademicYears();
   const [mode, setMode] = useState("cards");   // cards | wheel
   const [wm, setWm] = useState("attendance");
   const { user } = useAuth();
@@ -46,7 +51,7 @@ export default function ClassesPage() {
   const [classes, setClasses] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", section: "", academic_year: "", teacher_id: "", secondary_teacher_id: "", attender_name: "", attender_phone: "" });
+  const [form, setForm] = useState({ name: "", section: "", academic_year: "", teacher_id: "", secondary_teacher_id: "", attender_name: "", attender_phone: "", subjects: [] });
   const [teachers, setTeachers] = useState([]);
   const [stats, setStats] = useState({});
 
@@ -61,17 +66,18 @@ export default function ClassesPage() {
     api.get("/users").then((r) => setTeachers(r.data.filter((u) => u.role !== "parent" && u.active))).catch(() => {});
   }, [user?.role]);
   const teacherName = (id) => teachers.find((t) => t.id === id)?.name;
-  const EMPTY = { name: "", section: "", academic_year: "", teacher_id: "", secondary_teacher_id: "", attender_name: "", attender_phone: "" };
+  const EMPTY = { name: "", section: "", academic_year: "", teacher_id: "", secondary_teacher_id: "", attender_name: "", attender_phone: "", subjects: [] };
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ ...EMPTY, academic_year: new Date().getFullYear().toString() });
+    setForm({ ...EMPTY, academic_year: ys.current || "" });
     setShowForm(true);
   };
   const openEdit = (c) => {
     setEditing(c);
     setForm({ name: c.name || "", section: c.section || "", academic_year: c.academic_year || "", teacher_id: c.teacher_id || "",
-      secondary_teacher_id: c.secondary_teacher_id || "", attender_name: c.attender_name || "", attender_phone: c.attender_phone || "" });
+      secondary_teacher_id: c.secondary_teacher_id || "", attender_name: c.attender_name || "", attender_phone: c.attender_phone || "",
+      subjects: (c.subjects || []).map((x) => ({ name: x.name, teacher_id: x.teacher_id || "" })) });
     setShowForm(true);
   };
 
@@ -80,7 +86,8 @@ export default function ClassesPage() {
     try {
       if (!form.teacher_id) { toast.error("Please choose the primary class teacher"); return; }
       const body = { ...form, secondary_teacher_id: form.secondary_teacher_id || null,
-        attender_name: form.attender_name.trim() || null, attender_phone: form.attender_phone.trim() || null };
+        attender_name: form.attender_name.trim() || null, attender_phone: form.attender_phone.trim() || null,
+        subjects: form.subjects.filter((x) => x.name.trim()).map((x) => ({ name: x.name.trim(), teacher_id: x.teacher_id || null })) };
       if (editing) await api.put(`/classes/${editing.id}`, body);
       else await api.post("/classes", body);
       toast.success(editing ? "Class updated" : "Class created");
@@ -210,6 +217,8 @@ export default function ClassesPage() {
                     : isAdmin && <li className="rounded-lg bg-amber-50 text-amber-800 px-3 py-2 text-xs" data-testid={`no-teacher-${c.id}`}>No class teacher assigned. Edit to assign one.</li>}
                   {c.secondary_teacher_id && <li className="flex items-center gap-2.5"><span className="h-7 w-7 grid place-items-center rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">{initials(teacherName(c.secondary_teacher_id))}</span><span><span className="block text-[11px] text-slate-500 leading-none">Second teacher</span><b className="font-medium text-slate-800">{teacherName(c.secondary_teacher_id) || "Assigned"}</b></span></li>}
                   {c.attender_name && <li className="flex items-center gap-2.5"><span className="h-7 w-7 grid place-items-center rounded-full bg-slate-100 text-slate-500"><Phone className="h-3.5 w-3.5" aria-hidden="true" /></span><span><span className="block text-[11px] text-slate-500 leading-none">Attender</span><b className="font-medium text-slate-800">{c.attender_name}</b>{c.attender_phone && <a href={`tel:${c.attender_phone.replace(/\s/g, "")}`} className="relative z-10 ml-2 text-[#2B4BFF] hover:underline">{c.attender_phone}</a>}</span></li>}
+                  {(c.subjects || []).length > 0 && <li className="pt-1" data-testid={`class-subjects-${c.id}`}><span className="block text-[11px] text-slate-500 leading-none mb-1.5">Subjects</span>
+                    <div className="flex flex-wrap gap-1.5">{c.subjects.map((x) => <span key={x.name} className="rounded-lg bg-[#F1F3FA] px-2 py-1 text-xs text-slate-700">{x.name} <span className="text-slate-400">· {teacherName(x.teacher_id || c.teacher_id)?.split(" ")[0] || "Teacher"}</span></span>)}</div></li>}
                 </ul>
               </div>
             </article>
@@ -237,8 +246,9 @@ export default function ClassesPage() {
               </div>
               <div>
                 <label className="field-label">Academic year</label>
-                <input data-testid="class-year-input" className="ui-input mt-1" value={form.academic_year}
-                  onChange={(e) => setForm({ ...form, academic_year: e.target.value })} placeholder="2025" />
+                <select data-testid="class-year-input" className="ui-input mt-1" value={form.academic_year} onChange={(e) => setForm({ ...form, academic_year: e.target.value })}>
+                  {[...new Set([form.academic_year, ...ys.years, nextYear(ys.current)].filter(Boolean))].map((y) => <option key={y} value={y}>{y}{y === ys.current ? " (this year)" : ""}</option>)}
+                </select>
               </div>
             </div>
             <div>
@@ -256,6 +266,25 @@ export default function ClassesPage() {
                 <option value="">None</option>
                 {teachers.filter((t) => t.id !== form.teacher_id).map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
               </select>
+            </div>
+            <div data-testid="class-subjects">
+              <label className="field-label">Subjects and who teaches them <span className="font-normal text-slate-400">(optional)</span></label>
+              <p className="text-xs text-slate-500 mt-0.5">Leave the teacher on &quot;Class teacher&quot; unless someone else takes the subject. Subject teachers can update their own subjects on the Syllabus page.</p>
+              <div className="mt-2 space-y-2">
+                {form.subjects.map((x, i) => (
+                  <div key={i} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] gap-2" data-testid={`class-subject-row-${i}`}>
+                    <input className="ui-input" aria-label="Subject" placeholder="Maths" maxLength={80} value={x.name} data-testid={`class-subject-name-${i}`}
+                      onChange={(e) => setForm({ ...form, subjects: form.subjects.map((y, j) => (j === i ? { ...y, name: e.target.value } : y)) })} />
+                    <select className="ui-input" aria-label={`Teacher for ${x.name || "subject"}`} value={x.teacher_id} data-testid={`class-subject-teacher-${i}`}
+                      onChange={(e) => setForm({ ...form, subjects: form.subjects.map((y, j) => (j === i ? { ...y, teacher_id: e.target.value } : y)) })}>
+                      <option value="">Class teacher</option>
+                      {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    <button type="button" className="ui-btn !px-2.5 text-red-600" aria-label={`Remove ${x.name || "subject"}`} onClick={() => setForm({ ...form, subjects: form.subjects.filter((_, j) => j !== i) })}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                  </div>
+                ))}
+              </div>
+              <button type="button" className="ui-btn mt-2 text-sm" data-testid="class-subject-add" onClick={() => setForm({ ...form, subjects: [...form.subjects, { name: "", teacher_id: "" }] })}><Plus className="h-4 w-4" aria-hidden="true" /> Add subject</button>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
