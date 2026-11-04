@@ -77,6 +77,23 @@ def tag_subjects(subjects: list, c: dict, users: dict) -> list:
     return [{**s, "teacher": m.get(s["name"].strip().lower(), dflt)} for s in subjects]
 
 
+def owner_of(c: dict, name: str) -> Optional[str]:
+    """Id of the teacher who owns a subject in this class: the one set on it, otherwise the class teacher."""
+    for x in c.get("subjects") or []:
+        if x["name"].strip().lower() == name.strip().lower():
+            return x.get("teacher_id") or c.get("teacher_id")
+    return c.get("teacher_id")
+
+
+def scope_doc(d: dict, c: dict, uid: str) -> dict:
+    """A syllabus document cut down to the subjects this teacher owns (and no one else's author details)."""
+    out = {**d, "subjects": [s for s in d.get("subjects", []) if owner_of(c, s["name"]) == uid]}
+    if d.get("updated_by") != uid:
+        out["updated_by_name"] = None
+        out["updated_by"] = None
+    return out
+
+
 def subject_year(docs: list) -> dict:
     """Subject name -> whole-year coverage: the three terms averaged, a term where the subject isn't set up counting as nothing."""
     names, per = [], {}
@@ -165,11 +182,14 @@ async def syllabus_summary(academic_year: Optional[str] = Query(None, pattern=r"
         async for s in ctx.db.students.find({"status": "active", **await scope_for(ctx)}, {"_id": 0, "first_name": 1, "class_id": 1}):
             kids.setdefault(s["class_id"], []).append(s["first_name"])
     rows = []
+    tch = ctx.role == "teacher"
     for c in classes:
         base = {"class_id": c["id"], "class_name": f"{c['name']} {c.get('section') or ''}".strip(),
-                "teacher": users.get(c.get("teacher_id")), "secondary_teacher": users.get(c.get("secondary_teacher_id")),
+                "teacher": None if tch else users.get(c.get("teacher_id")), "secondary_teacher": None if tch else users.get(c.get("secondary_teacher_id")),
                 **({"children": kids.get(c["id"], [])} if ctx.role == "parent" else {})}
         mine = docs.get(c["id"], [])
+        if tch:   # a teacher sees only the subjects they teach
+            mine = [d for d in (scope_doc(x, c, ctx.user["id"]) for x in mine) if d["subjects"]]
         running = [d for d in mine if d["start_date"] <= today.isoformat() <= d["end_date"]]
         past = sorted((d for d in mine if d["end_date"] < today.isoformat()), key=lambda d: d["end_date"])
         coming = sorted((d for d in mine if d["start_date"] > today.isoformat()), key=lambda d: d["start_date"])
@@ -200,6 +220,9 @@ async def get_syllabus(class_id: str, term: str = Query(..., min_length=1, max_l
         doc = {"id": None, "class_id": class_id, "term": term.strip(), "academic_year": year, "start_date": a.isoformat(), "end_date": b.isoformat(),
                "subjects": [], "updated_at": None, "last_update_date": None}
     users = {u["id"]: u["name"] async for u in ctx.db.users.find({}, {"_id": 0, "id": 1, "name": 1})}
+    tch = ctx.role == "teacher"
+    if tch:
+        doc = scope_doc(doc, c, ctx.user["id"])
     out = _enrich(doc, today)
     out["subjects"] = tag_subjects(out["subjects"], c, users)
     out["exists"] = bool(doc.get("id"))
@@ -207,8 +230,13 @@ async def get_syllabus(class_id: str, term: str = Query(..., min_length=1, max_l
     out["class_subjects"] = [{"name": n, "teacher": t} for n, t in ((x["name"], subject_teachers(c, users)[x["name"].strip().lower()]) for x in c.get("subjects") or [])]
     out["class_teacher"] = users.get(c.get("teacher_id"))
     out["my_subjects"] = None   # None = may edit every subject
-    if ctx.role == "teacher" and ctx.user["id"] not in (c.get("teacher_id"), c.get("secondary_teacher_id")):
-        out["my_subjects"] = [x["name"] for x in c.get("subjects") or [] if x.get("teacher_id") == ctx.user["id"]]
+    if tch:
+        uid = ctx.user["id"]
+        out["class_subjects"] = [x for x in out["class_subjects"] if x["teacher"]["id"] == uid]
+        out["class_teacher"] = None
+        out["my_subjects"] = None   # everything a teacher is shown is theirs
+        out["subjects"] = [{**x, "teacher": None} for x in out["subjects"]]
+        out["class_subjects"] = [{**x, "teacher": None} for x in out["class_subjects"]]
     return out
 
 
@@ -218,7 +246,7 @@ async def save_syllabus(class_id: str, payload: SyllabusIn, ctx: TenantContext =
     if cls is None:
         raise HTTPException(status_code=403, detail="You can only manage students in classes assigned to you.")
     own = ctx.user["id"] in (cls.get("teacher_id"), cls.get("secondary_teacher_id"))
-    mine = None if own else {x["name"].strip().lower() for x in cls.get("subjects") or [] if x.get("teacher_id") == ctx.user["id"]}
+    uid = ctx.user["id"]
     a, b = _d(payload.start_date), _d(payload.end_date)
     if b < a:
         raise HTTPException(status_code=400, detail="The term can't end before it starts")
@@ -233,15 +261,16 @@ async def save_syllabus(class_id: str, payload: SyllabusIn, ctx: TenantContext =
         subjects.append({"name": s.name.strip(), "percent": 0 if ch else s.percent, "chapters": ch, "note": (s.note or "").strip() or None})
     today = today_ist()
     key = {"class_id": class_id, "term": term, "academic_year": year}
-    if mine is not None:   # a subject teacher changes only their own subjects; everything else stays as it was saved
-        old = await ctx.db.syllabus.find_one(key, {"_id": 0}) or {}
-        have = {x["name"].strip().lower(): x for x in old.get("subjects", [])}
-        incoming = {x["name"].strip().lower(): x for x in subjects}
-        merged = [incoming.get(k, v) if k in mine else v for k, v in have.items()]
-        merged += [v for k, v in incoming.items() if k in mine and k not in have]
-        subjects = merged
-        if old:
-            a, b = _d(old["start_date"]), _d(old["end_date"])
+    # a teacher changes only the subjects they own; everything else stays exactly as it was saved
+    old = await ctx.db.syllabus.find_one(key, {"_id": 0}) or {}
+    have = {x["name"].strip().lower(): x for x in old.get("subjects", [])}
+    incoming = {x["name"].strip().lower(): x for x in subjects}
+    merged = [v for k, v in have.items() if owner_of(cls, v["name"]) != uid or k in incoming]
+    merged = [incoming[k] if (k in incoming and owner_of(cls, v["name"]) == uid) else v for k, v in ((x["name"].strip().lower(), x) for x in merged)]
+    merged += [v for k, v in incoming.items() if k not in have and owner_of(cls, v["name"]) == uid]
+    subjects = merged
+    if old and not own:
+        a, b = _d(old["start_date"]), _d(old["end_date"])
     await ctx.db.syllabus.update_one(key, {"$set": {"start_date": a.isoformat(), "end_date": b.isoformat(), "subjects": subjects,
                                                     "updated_at": now_iso(), "updated_by": ctx.user["id"], "updated_by_name": ctx.user.get("name", ""),
                                                     "last_update_date": today.isoformat()},
@@ -256,13 +285,21 @@ async def save_syllabus(class_id: str, payload: SyllabusIn, ctx: TenantContext =
 async def syllabus_log(class_id: str, term: str = Query(..., min_length=1, max_length=100),
                        academic_year: Optional[str] = Query(None, pattern=r"^\d{4}-\d{2}$"), ctx: TenantContext = Depends(get_ctx)):
     """Day by day coverage for one class and term, with the pacing target for each day."""
-    await _class_or_404(ctx, class_id)
+    c = await _class_or_404(ctx, class_id)
     year = academic_year or current_year()
     doc = await ctx.db.syllabus.find_one({"class_id": class_id, "term": term.strip(), "academic_year": year}, {"_id": 0})
     if not doc:
         return {"days": []}
+    mine_names = {x["name"] for x in doc.get("subjects", []) if owner_of(c, x["name"]) == ctx.user["id"]} if ctx.role == "teacher" else None
     start, end = date.fromisoformat(doc["start_date"]), date.fromisoformat(doc["end_date"])
     rows = await ctx.db.syllabus_log.find({"class_id": class_id, "term": term.strip(), "academic_year": year}, {"_id": 0}).sort("date", 1).to_list(400)
-    return {"start_date": doc["start_date"], "end_date": doc["end_date"],
-            "days": [{"date": r["date"], "overall": r["overall"], "subjects": r["subjects"],
-                      "target": target_percent(start, end, date.fromisoformat(r["date"]))} for r in rows]}
+    days = []
+    for r in rows:
+        subj, overall = r["subjects"], r["overall"]
+        if mine_names is not None:
+            subj = {k: v for k, v in subj.items() if k in mine_names}
+            overall = round(sum(subj.values()) / len(subj)) if subj else None
+            if not subj:
+                continue
+        days.append({"date": r["date"], "overall": overall, "subjects": subj, "target": target_percent(start, end, date.fromisoformat(r["date"]))})
+    return {"start_date": doc["start_date"], "end_date": doc["end_date"], "days": days}

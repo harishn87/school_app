@@ -11,6 +11,7 @@ import FeeInsights from "@/components/FeeInsights";
 import CountUp from "@/components/CountUp";
 import { useLive } from "@/lib/live";
 import TermFeeCards, { normTerm, termRows } from "@/components/TermFees";
+import ChildPicker, { useChildPick } from "@/components/ChildPicker";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 export default function FeesPage() {
@@ -46,7 +47,10 @@ export default function FeesPage() {
 
   const sMap = useMemo(() => Object.fromEntries(students.map((s) => [s.id, s])), [students]);
 
-  const forStudent = useMemo(() => (studentId ? fees.filter((f) => f.student_id === studentId) : fees), [fees, studentId]);
+  const parentMulti = !isAdmin && students.length > 1;
+  const [pickedKid, pickKid] = useChildPick(parentMulti ? students : []);
+  const sid = studentId || (parentMulti ? pickedKid : "");
+  const forStudent = useMemo(() => (sid ? fees.filter((f) => f.student_id === sid) : fees), [fees, sid]);
   const terms = useMemo(() => termRows(forStudent), [forStudent]);
   const base = useMemo(() => (term ? forStudent.filter((f) => normTerm(f.term) === term) : forStudent), [forStudent, term]);
   const owed = (f) => Math.max(Number(f.amount || 0) - Number(f.paid_amount || 0), 0);
@@ -113,6 +117,7 @@ export default function FeesPage() {
         </div>
       )}
 
+      <ChildPicker kids={parentMulti ? students : []} value={pickedKid} onPick={pickKid} />
       <YearSelect chips years={ys.years} current={ys.current} value={activeYear} onChange={setYear} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -123,7 +128,7 @@ export default function FeesPage() {
 
       <section aria-label="Fees by term" data-testid="fees-by-term">
         <h2 className="font-heading font-semibold mb-3">{isAdmin ? "Collected by term" : "Paid and pending by term"}</h2>
-        {!isAdmin && students.length > 1 && !studentId ? (
+        {!isAdmin && students.length > 1 && !sid ? (
           <div className="space-y-5">
             {students.map((s) => {
               const rows = termRows(fees.filter((f) => f.student_id === s.id));

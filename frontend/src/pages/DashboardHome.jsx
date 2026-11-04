@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLive } from "@/lib/live";
 import { formatMoney } from "@/lib/utils";
 import TermFeeCards from "@/components/TermFees";
+import ParentQuestions from "@/components/ParentQuestions";
 import ProgressBoard from "@/components/ProgressBoard";
 import SyllabusWheel from "@/components/SyllabusWheel";
 import { useSyllabusSummary } from "@/components/Syllabus";
@@ -151,6 +152,8 @@ export default function DashboardHome() {
           <TermFeeCards terms={stats.fees_by_term} onPick={(t) => navigate(`/app/fees?term=${encodeURIComponent(t)}`)} testid="overview-terms" />
         </section>
       )}
+
+      {teacher && <ParentQuestions />}
 
       {!parent && <ProgressBoard />}
 

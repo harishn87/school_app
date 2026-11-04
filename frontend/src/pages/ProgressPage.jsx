@@ -7,6 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import PageHero from "@/components/PageHero";
 import ReportCard from "@/components/ReportCard";
 import { AcademicWheel, StaffAnalysis, TermsWheel } from "@/components/StudentAnalysis";
+import ChildPicker, { useChildPick } from "@/components/ChildPicker";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 const TERMS = ["Term 1", "Term 2", "Term 3", "Annual"];
@@ -15,6 +16,7 @@ const defaultSubjects = (name = "") => (/^(pp|nursery|lkg|ukg)/i.test(name.trim(
 /* ---------------- parents: reports for their children ---------------- */
 function ParentProgress() {
   const [kids, setKids] = useState(null);
+  const [kid, pickKid] = useChildPick(kids);
   const [reports, setReports] = useState([]);
   const ys = useAcademicYears();
   const [year, setYear] = useState("");
@@ -29,7 +31,8 @@ function ParentProgress() {
       <PageHero title="Academics" subtitle="Marks and teacher remarks, updated by your child's class teacher." />
       <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} />
       {kids && kids.length === 0 && <div className="ui-card p-8 text-center text-slate-500">No students are linked to your account yet.</div>}
-      {kids?.map((k) => {
+      <ChildPicker kids={kids} value={kid} onPick={pickKid} />
+      {kids?.filter((k) => k.id === kid).map((k) => {
         const mine = reports.filter((r) => r.student_id === k.id);
         return (
           <section key={k.id} className="space-y-3" data-testid={`progress-child-${k.id}`}>
@@ -228,7 +231,7 @@ function StaffProgress() {
           </tbody>
         </table>
       </div>}
-      {view === "marks" && <p className="text-xs text-slate-500">Leave a mark empty if the student didn&apos;t take that subject. Clearing a student&apos;s marks and remark removes their report for this term. <Link className="text-[#2B4BFF]" to="/app/students">Students</Link></p>}
+      {view === "marks" && <p className="text-xs text-slate-500">Leave a mark empty if the student didn&apos;t take that subject. Clearing a student&apos;s marks and remark removes their report for this term. {user?.role === "admin" && <Link className="text-[#2B4BFF]" to="/app/students">Students</Link>}</p>}
     </div>
   );
 }

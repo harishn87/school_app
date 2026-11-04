@@ -73,7 +73,7 @@ export default function App() {
           <Route path="/app" element={<Protected><DashboardLayout /></Protected>}>
             <Route index element={<Home />} />
             <Route path="diary" element={<RoleOnly roles={["teacher", "parent"]}><DiaryPage /></RoleOnly>} />
-            <Route path="students" element={<StudentsPage />} />
+            <Route path="students" element={<RoleOnly roles={["admin", "parent"]}><StudentsPage /></RoleOnly>} />
             <Route path="students/:id" element={<StudentDetailPage />} />
             <Route path="classes" element={<ClassesPage />} />
             <Route path="classes/:id" element={<RoleOnly roles={["admin", "teacher"]}><ClassDetailPage /></RoleOnly>} />

@@ -184,16 +184,28 @@ def test_class_subject_teachers(server, new_client):
     assert server.put(f"/api/classes/{cid}", json={**body, "subjects": [{"name": "Maths", "teacher_id": "nobody"}]}).status_code in (400, 404)
     ok = x["t1"].put(f"/api/syllabus/{cid}", json=_body([{"name": "Maths", "percent": 40}, {"name": "English", "percent": 30}]))
     assert ok.status_code == 200, ok.text
-    who = {s["name"]: s["teacher"]["id"] for s in ok.json()["subjects"]}
-    assert who == {"Maths": t1["id"], "English": t2["id"]}
-    # the second teacher is a subject teacher only: sees the class, changes English only, can't touch dates or Maths
+    # a teacher is shown, and can change, only the subjects they teach: English belongs to t2 so t1's value for it is ignored
+    mine = ok.json()
+    assert [s["name"] for s in mine["subjects"]] == ["Maths"] and mine["class_teacher"] is None
+    assert all(s["teacher"] is None for s in mine["subjects"]) and [x["name"] for x in mine["class_subjects"]] == ["Maths"]
+    # the principal still sees every subject with its teacher
+    full = server.get(f"/api/syllabus?class_id={cid}&term=Term 2").json()
+    assert {s["name"]: s["teacher"]["id"] for s in full["subjects"]} == {"Maths": t1["id"]}
     t2c = new_client()
     assert t2c.post("/api/auth/login", json={"school_code": "greenwood", "email": "t2@greenwood.example.com", "password": "Str0ngPass!"}).status_code == 200
     g = t2c.get(f"/api/syllabus?class_id={cid}&term=Term 2").json()
-    assert g["my_subjects"] == ["English"]
+    assert g["subjects"] == [] and [x["name"] for x in g["class_subjects"]] == ["English"] and g["class_teacher"] is None
     r = t2c.put(f"/api/syllabus/{cid}", json=_body([{"name": "Maths", "percent": 99}, {"name": "English", "percent": 70}], back=5, ahead=5)).json()
-    pct = {s["name"]: s["percent"] for s in r["subjects"]}
-    assert pct == {"Maths": 40, "English": 70}
+    assert {s["name"]: s["percent"] for s in r["subjects"]} == {"English": 70}
+    assert r["updated_by_name"] and r["class_teacher"] is None
+    assert {s["name"]: s["percent"] for s in x["t1"].get(f"/api/syllabus?class_id={cid}&term=Term 2").json()["subjects"]} == {"Maths": 40}
+    both = {s["name"]: (s["percent"], s["teacher"]["id"]) for s in server.get(f"/api/syllabus?class_id={cid}&term=Term 2").json()["subjects"]}
+    assert both == {"Maths": (40, t1["id"]), "English": (70, t2["id"])}
+    # summary and log hide the other teacher's subjects and the staff names
+    sm = t2c.get("/api/syllabus/summary").json()["classes"][0]
+    assert sm["teacher"] is None and [s["name"] for s in sm["subjects"]] == ["English"] and sm["percent"] == 70
+    lg = t2c.get(f"/api/syllabus/log?class_id={cid}&term=Term 2").json()
+    assert lg["days"] and all(list(d["subjects"]) == ["English"] for d in lg["days"])
     # staff performance: each teacher is judged on the subjects they teach
     sp = {t["id"]: t for t in server.get("/api/staff/performance").json()["teachers"]}
     assert sp[t2["id"]]["classes"][0]["role"] == "Subject teacher"
@@ -218,3 +230,33 @@ def test_excel_export_for_principal(server, new_client):
     # only the principal may download
     assert x["t1"].get("/api/export/school.xlsx").status_code == 403
     assert x["mom"].get("/api/export/school.xlsx").status_code == 403
+
+
+def test_student_notes(server, new_client):
+    x = _setup(server, new_client)
+    kid = next(s for s in server.get("/api/students").json() if s["first_name"] == "Aarav")
+    t1 = x["t1"]
+    r = t1.post(f"/api/students/{kid['id']}/notes", json={"body": "Please bring the signed form tomorrow.", "urgent": True})
+    assert r.status_code == 201, r.text
+    assert r.json()["urgent"] is True and r.json()["created_by_name"]
+    assert t1.post(f"/api/students/{kid['id']}/notes", json={"body": " "}).status_code == 400
+    assert t1.post(f"/api/students/{kid['id']}/notes", json={"body": ""}).status_code == 422
+    # the parent reads it but can't write or delete
+    mom = x["mom"]
+    notes = mom.get(f"/api/students/{kid['id']}/notes").json()
+    assert [n["body"] for n in notes][-1] == "Please bring the signed form tomorrow."
+    # the parent can ask the teacher; it lands in the teacher's inbox, can't be marked important, and the teacher's reply marks it answered
+    q = mom.post(f"/api/students/{kid['id']}/notes", json={"body": "Can he get extra help in fractions?", "urgent": True})
+    assert q.status_code == 201 and q.json()["from_role"] == "parent" and q.json()["urgent"] is False
+    inbox = t1.get("/api/student-notes/inbox").json()
+    assert [i["body"] for i in inbox] == ["Can he get extra help in fractions?"] and inbox[0]["answered"] is False and inbox[0]["student_name"].startswith("Aarav")
+    assert x["t2"].get(f"/api/students/{kid['id']}/notes").status_code == 403
+    assert x["other"].get(f"/api/students/{kid['id']}/notes").status_code == 404
+    assert x["other"].post(f"/api/students/{kid['id']}/notes", json={"body": "hi"}).status_code == 404
+    assert t1.post(f"/api/students/{kid['id']}/notes", json={"body": "Yes, after school on Tuesdays."}).status_code == 201
+    assert t1.get("/api/student-notes/inbox").json()[0]["answered"] is True
+    assert mom.get("/api/student-notes/inbox").status_code == 403
+    mine = next(n for n in mom.get(f"/api/students/{kid['id']}/notes").json() if n["from_role"] == "parent")
+    assert mom.delete(f"/api/student-notes/{notes[-1]['id']}").status_code == 403
+    assert mom.delete(f"/api/student-notes/{mine['id']}").status_code == 200
+    assert t1.delete(f"/api/student-notes/{notes[-1]['id']}").status_code == 200

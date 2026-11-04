@@ -178,6 +178,11 @@ class PostIn(BaseModel):
     draft: bool = False                                            # saved for later, parents don't see it until published
 
 
+class StudentNoteIn(BaseModel):
+    body: str = Field(min_length=1, max_length=1000)
+    urgent: bool = False
+
+
 class PostItem(BaseModel):
     title: str = Field(min_length=1, max_length=150)
     body: Optional[str] = Field(default=None, max_length=2000)

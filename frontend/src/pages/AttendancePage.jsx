@@ -1,3 +1,4 @@
+import ChildPicker, { useChildPick } from "@/components/ChildPicker";
 import PageHero from "@/components/PageHero";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -24,7 +25,6 @@ export default function AttendancePage() {
   const [marks, setMarks] = useState({}); // {student_id: status}
   const [saving, setSaving] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const [kid, setKid] = useState("");
   const [tile, setTile] = useState(null); // null | present | absent | late | unmarked | all
   const [touched, setTouched] = useState({}); // rows edited since the tile was chosen stay visible
   const listRef = useRef(null);
@@ -55,6 +55,7 @@ export default function AttendancePage() {
     () => students.filter((s) => !classId || s.class_id === classId),
     [students, classId]
   );
+  const [kid, setKid] = useChildPick(filtered);
 
   const setStatus = (sid, status) => { setTouched((t) => ({ ...t, [sid]: true })); setMarks((m) => ({ ...m, [sid]: status })); };
 
@@ -102,15 +103,11 @@ export default function AttendancePage() {
 
   if (isParent) {
     const mine = filtered;
-    const cur = kid || mine[0]?.id || "";
+    const cur = kid;
     return (
       <div className="max-w-3xl mx-auto space-y-5 animate-fade-up" data-testid="attendance-page">
         <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">Attendance</h1>
-        {mine.length > 1 && (
-          <select className="ui-input" value={cur} onChange={(e) => setKid(e.target.value)} aria-label="Child" data-testid="attendance-child">
-            {mine.map((s) => <option key={s.id} value={s.id}>{s.first_name} {s.last_name}</option>)}
-          </select>
-        )}
+        <ChildPicker kids={mine} value={cur} onPick={setKid} />
         {cur ? <><MonthCalendar key={cur} studentId={cur} /><YearAttendance key={`y${cur}`} studentId={cur} /></> : <div className="ui-card p-8 text-center text-slate-500">No students are linked to your account yet.</div>}
       </div>
     );

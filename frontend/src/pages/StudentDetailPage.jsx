@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import StudentFormModal from "@/components/StudentFormModal";
 import StudentProfileTabs from "@/components/StudentProfileTabs";
+import StudentNotes from "@/components/StudentNotes";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 export default function StudentDetailPage() {
@@ -47,7 +48,7 @@ export default function StudentDetailPage() {
   return (
     <div className="max-w-5xl mx-auto space-y-6 animate-fade-up" data-testid="student-detail-page">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <Link to="/app/students" className="ui-btn bg-white text-sm" data-testid="back-to-students">
+        <Link to={user?.role === "teacher" ? (student.class_id ? `/app/classes/${student.class_id}` : "/app/classes") : "/app/students"} className="ui-btn bg-white text-sm" data-testid="back-to-students">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Back
         </Link>
         <div className="flex gap-2">
@@ -98,6 +99,8 @@ export default function StudentDetailPage() {
           )}
         </div>
       </div>
+
+      {canEdit && <StudentNotes studentId={id} canWrite myId={user?.id} isAdmin={user?.role === "admin"} />}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-heading text-2xl font-semibold">Full record</h2>

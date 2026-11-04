@@ -1,3 +1,4 @@
+import ChildPicker, { useChildPick } from "@/components/ChildPicker";
 import { useEffect, useState } from "react";
 import { SyllabusBoard, useSyllabusSummary } from "@/components/Syllabus";
 import { Link } from "react-router-dom";
@@ -9,6 +10,8 @@ import { fmtTime, formatDate, formatMoney } from "@/lib/utils";
 import PostCard from "@/components/PostCard";
 import MonthCalendar from "@/components/MonthCalendar";
 import ReportCard from "@/components/ReportCard";
+import StudentNotes from "@/components/StudentNotes";
+import ExamSyllabus from "@/components/ExamSyllabus";
 import TermFeeCards from "@/components/TermFees";
 
 const STATUS = {
@@ -17,7 +20,7 @@ const STATUS = {
   absent: ["Absent today", "bg-rose-50 text-rose-700"],
 };
 
-function Child({ c, report }) {
+function Child({ c, report, user }) {
   const [txt, tone] = STATUS[c.attendance.today] || ["Not marked yet", "bg-slate-100 text-slate-600"];
   const pct = c.attendance.percent;
   const nd = c.fees.next_due;
@@ -31,6 +34,8 @@ function Child({ c, report }) {
         </div>
       </div>
       <span className={`pill ${tone} mt-3`}>{txt}</span>
+
+      <div className="mt-4"><StudentNotes studentId={c.id} asParent myId={user?.id} testid={`pnotes-${c.id}`} /></div>
 
       <div className="mt-5 grid sm:grid-cols-2 gap-3">
         <Link to="/app/attendance" className="rounded-xl bg-[#F1F4FF] p-4 hover:bg-[#E8ECFF] transition-colors">
@@ -97,6 +102,7 @@ export default function ParentHome() {
   const [data, setData] = useState(null);
   const [classes, setClasses] = useState({});
   const [reports, setReports] = useState([]);
+  const [kid, pickKid] = useChildPick(data?.children);
   const live = useLive(30000);
   const { data: syl } = useSyllabusSummary(live);
 
@@ -118,7 +124,10 @@ export default function ParentHome() {
           No students are linked to <b>{user?.email}</b> yet. Ask the school to add your email as the guardian email on your child&apos;s profile.
         </div>
       )}
-      {data?.children.map((c) => <Child key={c.id} c={c} report={[...reports.filter((r) => r.student_id === c.id)].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0]} />)}
+      <ChildPicker kids={data?.children} value={kid} onPick={pickKid} />
+      {data?.children.filter((c) => c.id === kid).map((c) => <Child key={c.id} c={c} user={user} report={[...reports.filter((r) => r.student_id === c.id)].sort((a, b) => (b.updated_at || "").localeCompare(a.updated_at || ""))[0]} />)}
+
+      {data?.children.filter((c) => c.id === kid).map((c) => <ExamSyllabus key={c.id} classId={c.class_id} testid={`exam-${c.id}`} />)}
 
       {data && data.children.length > 0 && syl && syl.classes.length > 0 && (
         <SyllabusBoard data={syl} testid="parent-syllabus" title="Syllabus progress"

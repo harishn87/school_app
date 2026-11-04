@@ -8,7 +8,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..models import PostBatchIn, PostIn
+from ..models import PostBatchIn, PostIn, StudentNoteIn
 from ..security import TenantContext, get_ctx, require_roles
 from ..utils import current_year, fee_terms, new_id, now_iso
 from .school import fee_status, student_scope, teacher_class_ids
@@ -132,6 +132,67 @@ async def delete_post(post_id: str, ctx: TenantContext = Depends(require_roles("
     if ctx.role == "teacher" and post.get("created_by") != ctx.user["id"]:
         raise HTTPException(status_code=403, detail="You can delete only your own posts")
     await ctx.db.posts.delete_one({"id": post_id})
+    return {"ok": True}
+
+
+async def _student_for_notes(ctx: TenantContext, student_id: str, write: bool) -> dict:
+    st = await ctx.db.students.find_one({"id": student_id}, {"_id": 0, "photo_base64": 0})
+    if not st:
+        raise HTTPException(status_code=404, detail="Student not found")
+    if ctx.role == "parent":
+        if not await ctx.db.students.find_one({**student_scope(ctx), "id": student_id}, {"_id": 1}):
+            raise HTTPException(status_code=404, detail="Student not found")
+    elif ctx.role == "teacher" and st.get("class_id") not in await teacher_class_ids(ctx):
+        raise HTTPException(status_code=403, detail="You can write notes only for students in your own classes.")
+    return st
+
+
+@router.post("/students/{student_id}/notes", status_code=201)
+async def add_student_note(student_id: str, payload: StudentNoteIn, ctx: TenantContext = Depends(get_ctx)):
+    """A private message about one child: a teacher writes to the parents, a parent asks the teachers."""
+    st = await _student_for_notes(ctx, student_id, True)
+    if not payload.body.strip():
+        raise HTTPException(status_code=400, detail="Write the note first")
+    doc = {"id": new_id(), "student_id": student_id, "class_id": st.get("class_id"), "body": payload.body.strip(), "urgent": payload.urgent and ctx.role != "parent",
+           "from_role": "parent" if ctx.role == "parent" else "teacher",
+           "created_by": ctx.user["id"], "created_by_name": ctx.user.get("name", ""), "created_at": now_iso()}
+    await ctx.db.student_notes.insert_one(dict(doc))
+    return doc
+
+
+@router.get("/students/{student_id}/notes")
+async def list_student_notes(student_id: str, ctx: TenantContext = Depends(get_ctx)):
+    await _student_for_notes(ctx, student_id, False)
+    return await ctx.db.student_notes.find({"student_id": student_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+
+
+@router.get("/student-notes/inbox")
+async def student_notes_inbox(ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
+    """Latest messages parents have sent about children in the teacher's classes (the school's classes for an admin)."""
+    q: dict = {"from_role": "parent"}
+    if ctx.role == "teacher":
+        q["class_id"] = {"$in": await teacher_class_ids(ctx)}
+    rows = await ctx.db.student_notes.find(q, {"_id": 0}).sort("created_at", -1).to_list(15)
+    kids = {k["id"]: k async for k in ctx.db.students.find({"id": {"$in": [r["student_id"] for r in rows]}}, {"_id": 0, "id": 1, "first_name": 1, "last_name": 1})}
+    classes = {c["id"]: c async for c in ctx.db.classes.find({}, {"_id": 0, "id": 1, "name": 1, "section": 1})}
+    out = []
+    for r in rows:
+        k, c = kids.get(r["student_id"]), classes.get(r.get("class_id"))
+        # unanswered = no teacher reply after it
+        later = await ctx.db.student_notes.count_documents({"student_id": r["student_id"], "from_role": "teacher", "created_at": {"$gt": r["created_at"]}})
+        out.append({**r, "student_name": f"{k['first_name']} {k.get('last_name', '')}".strip() if k else "", "answered": later > 0,
+                    "class_name": f"{c['name']} {c.get('section') or ''}".strip() if c else None})
+    return out
+
+
+@router.delete("/student-notes/{note_id}")
+async def delete_student_note(note_id: str, ctx: TenantContext = Depends(require_roles("admin", "teacher", "parent"))):
+    n = await ctx.db.student_notes.find_one({"id": note_id}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Note not found")
+    if ctx.role != "admin" and n.get("created_by") != ctx.user["id"]:
+        raise HTTPException(status_code=403, detail="You can delete only your own notes")
+    await ctx.db.student_notes.delete_one({"id": note_id})
     return {"ok": True}
 
 
