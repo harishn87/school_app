@@ -1,10 +1,11 @@
+import DateField from "@/components/DateField";
 import ChildPicker, { useChildPick } from "@/components/ChildPicker";
 import PageHero from "@/components/PageHero";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, errorMessage } from "@/lib/api";
 import { toast } from "sonner";
-import { Save, CalendarCheck, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { Save, CalendarCheck, CheckCircle2, XCircle, Clock, CalendarDays, School, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import SchoolMonthCalendar from "@/components/SchoolMonthCalendar";
 import MonthCalendar from "@/components/MonthCalendar";
@@ -18,7 +19,9 @@ export default function AttendancePage() {
 
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [date, setDate] = useState(params.get("date") || new Date().toLocaleDateString("en-CA"));
+  const todayStr = new Date().toLocaleDateString("en-CA");
+  const [date, setDate] = useState(params.get("date") || todayStr);
+  const shiftDay = (n) => { const d = new Date(`${date}T12:00:00`); d.setDate(d.getDate() + n); setDate(d.toLocaleDateString("en-CA")); };
   const [classId, setClassId] = useState(params.get("class") || "");
   const [classes, setClasses] = useState([]);
   const [students, setStudents] = useState([]);
@@ -117,18 +120,30 @@ export default function AttendancePage() {
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="attendance-page">
       <PageHero title="Daily attendance" subtitle={canMark ? "Mark your class in a few taps, or click any date on the calendar to see every class for that day." : "See who is in school. Class teachers mark attendance; click any date on the calendar to see every class for that day."} />
 
-      <div className="ui-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3 items-end" data-testid="attendance-filters">
-        <div>
-          <label className="field-label">Date</label>
-          <input type="date" className="ui-input mt-1" value={date} onChange={(e) => setDate(e.target.value)} data-testid="attendance-date" />
+      <div className="ui-card p-4 flex flex-wrap items-end gap-4" data-testid="attendance-filters">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#2B4BFF] to-[#1B2A7A] text-white shadow-md" aria-hidden="true"><CalendarDays className="h-5 w-5" /></span>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2B4BFF]" htmlFor="att-date">Date</label>
+            <div className="mt-0.5 flex items-center gap-1">
+              <button type="button" onClick={() => shiftDay(-1)} aria-label="Previous day" className="grid h-8 w-8 place-items-center rounded-lg bg-white border border-[#E1E5F5] text-slate-600 hover:text-[#2B4BFF] hover:border-[#2B4BFF]/40"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>
+              <DateField id="att-date" className="ui-input !w-auto min-w-[170px] !py-1.5" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} data-testid="attendance-date" />
+              <button type="button" onClick={() => shiftDay(1)} aria-label="Next day" className="grid h-8 w-8 place-items-center rounded-lg bg-white border border-[#E1E5F5] text-slate-600 hover:text-[#2B4BFF] hover:border-[#2B4BFF]/40"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
+              {date !== todayStr && <button type="button" onClick={() => setDate(todayStr)} className="ml-1 rounded-full bg-[#E9C46A] px-3 py-1 text-xs font-semibold text-[#0B1020] hover:bg-[#F2D283]" data-testid="attendance-today">Today</button>}
+            </div>
+          </div>
         </div>
-        <div>
-          <label className="field-label">Class</label>
-          <select className="ui-input mt-1" value={classId} onChange={(e) => setClassId(e.target.value)} data-testid="attendance-class">
-            <option value="">All classes</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
-          </select>
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#2B4BFF] to-[#1B2A7A] text-white shadow-md" aria-hidden="true"><School className="h-5 w-5" /></span>
+          <div>
+            <label className="block text-[11px] font-semibold uppercase tracking-wider text-[#2B4BFF]" htmlFor="att-class">Class</label>
+            <select id="att-class" className="ui-input mt-0.5 !w-auto min-w-[170px]" value={classId} onChange={(e) => setClassId(e.target.value)} data-testid="attendance-class">
+              <option value="">All classes</option>
+              {classes.map((c) => <option key={c.id} value={c.id}>{c.name} {c.section}</option>)}
+            </select>
+          </div>
         </div>
+        {canMark && <div className="flex-1" />}
         {canMark && (
           <>
             <button onClick={() => markAll("present")} className="ui-btn btn-soft-green"><CheckCircle2 className="h-4 w-4" aria-hidden="true" /> Mark all present</button>

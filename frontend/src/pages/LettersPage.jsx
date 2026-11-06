@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -184,7 +185,7 @@ export default function LettersPage() {
           <div className="grid sm:grid-cols-2 gap-4">
             <div>
               <label className="field-label" htmlFor="l-leave">Date of leaving</label>
-              <input id="l-leave" type="date" data-testid="l-leaving" className="ui-input mt-1.5" value={f.leaving_date} onChange={(e) => setF({ ...f, leaving_date: e.target.value })} />
+              <DateField id="l-leave" data-testid="l-leaving" className="ui-input mt-1.5" value={f.leaving_date} onChange={(e) => setF({ ...f, leaving_date: e.target.value })} />
             </div>
             <div>
               <label className="field-label" htmlFor="l-conduct">General conduct</label>

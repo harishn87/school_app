@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Plus, Trash2, Save, Check, Info, BookOpenCheck, CalendarClock, Target, ListChecks, Sparkles, TrendingUp, TrendingDown } from "lucide-react";
@@ -249,12 +250,12 @@ export default function SyllabusPage() {
 
       <div className="ui-card p-4 space-y-3" data-testid="syl-filters">
         <div className="flex flex-wrap items-end gap-3">
-          <YearSelect years={ys.years} current={ys.current} value={yr} onChange={(y) => set("year", y)} id="syl-year" label="Year" />
+          <YearSelect years={ys.years} current={ys.current} value={yr} onChange={(y) => set("year", y)} id="syl-year" label="Year" compact />
           <ClassSelect classes={classes} value={classId} onPick={(id) => set("class", id)} period={period} />
           <PeriodSelect row={row} value={period} onPick={(p) => set("term", p)} />
           {!yearView && teacher && draft && <div className="grid grid-cols-2 gap-2">
-            <label className="block"><span className="field-label">Term starts</span><input type="date" className="ui-input mt-1" value={draft.start_date} onChange={(e) => edit((d) => { d.start_date = e.target.value; })} data-testid="syl-start" /></label>
-            <label className="block"><span className="field-label">Term ends</span><input type="date" className="ui-input mt-1" value={draft.end_date} onChange={(e) => edit((d) => { d.end_date = e.target.value; })} data-testid="syl-end" /></label>
+            <label className="block"><span className="field-label">Term starts</span><DateField className="ui-input mt-1" value={draft.start_date} onChange={(e) => edit((d) => { d.start_date = e.target.value; })} data-testid="syl-start" /></label>
+            <label className="block"><span className="field-label">Term ends</span><DateField className="ui-input mt-1" value={draft.end_date} onChange={(e) => edit((d) => { d.end_date = e.target.value; })} data-testid="syl-end" /></label>
           </div>}
           {!yearView && !teacher && draft && <div className="text-sm text-slate-500"><CalendarClock className="inline h-4 w-4 mr-1" aria-hidden="true" />Term runs {draft.start_date} to {draft.end_date}</div>}
         </div>

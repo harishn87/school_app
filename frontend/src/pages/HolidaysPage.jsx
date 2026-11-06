@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -45,8 +46,8 @@ export default function HolidaysPage() {
       {admin && (
         <form onSubmit={add} className="ui-card p-5 grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 items-end" data-testid="holiday-form">
           <div><label className="field-label" htmlFor="h-name">Name</label><input id="h-name" className="ui-input" required maxLength={120} placeholder="Diwali break" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} data-testid="holiday-name" /></div>
-          <div><label className="field-label" htmlFor="h-date">From</label><input id="h-date" type="date" className="ui-input" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="holiday-date" /></div>
-          <div><label className="field-label" htmlFor="h-end">To (optional)</label><input id="h-end" type="date" className="ui-input" min={form.date} value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} data-testid="holiday-end" /></div>
+          <div><label className="field-label" htmlFor="h-date">From</label><DateField id="h-date" className="ui-input" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} data-testid="holiday-date" /></div>
+          <div><label className="field-label" htmlFor="h-end">To (optional)</label><DateField id="h-end" className="ui-input" min={form.date} value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} data-testid="holiday-end" /></div>
           <button className="ui-btn btn-primary" disabled={busy} data-testid="holiday-add"><Plus className="h-4 w-4" aria-hidden="true" /> Add</button>
         </form>
       )}

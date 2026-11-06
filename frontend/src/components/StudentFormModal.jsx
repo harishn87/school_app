@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { toast } from "sonner";
@@ -103,7 +104,7 @@ export default function StudentFormModal({ student, classes, onClose, onSaved })
             <input data-testid="student-last-name" required className="ui-input" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
           </Field>
           <Field label="Date of birth">
-            <input type="date" className="ui-input" value={form.date_of_birth || ""} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
+            <DateField className="ui-input" value={form.date_of_birth || ""} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
           </Field>
           <Field label="Gender">
             <select className="ui-input" value={form.gender || ""} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
@@ -114,10 +115,10 @@ export default function StudentFormModal({ student, classes, onClose, onSaved })
             </select>
           </Field>
           <Field label="Joining date *">
-            <input data-testid="student-joining-date" type="date" required className="ui-input" value={form.joining_date} onChange={(e) => setForm({ ...form, joining_date: e.target.value })} />
+            <DateField data-testid="student-joining-date" required className="ui-input" value={form.joining_date} onChange={(e) => setForm({ ...form, joining_date: e.target.value })} />
           </Field>
           <Field label="Leaving date">
-            <input data-testid="student-leaving-date" type="date" className="ui-input" value={form.leaving_date || ""} onChange={(e) => setForm({ ...form, leaving_date: e.target.value })} />
+            <DateField data-testid="student-leaving-date" className="ui-input" value={form.leaving_date || ""} onChange={(e) => setForm({ ...form, leaving_date: e.target.value })} />
           </Field>
           <Field label="Class">
             <select className="ui-input" value={form.class_id || ""} onChange={(e) => setForm({ ...form, class_id: e.target.value })}>

@@ -58,7 +58,7 @@ function Watch({ title, tone, rows, total, value, onAll, testid }) {
 }
 
 /** Staff overview: a clickable wheel of classes, who needs attention, and a compact student list. */
-export default function ProgressBoard() {
+export default function ProgressBoard({ year: yearProp }) {
   const navigate = useNavigate();
   const listRef = useRef(null);
   const [data, setData] = useState(null);
@@ -69,7 +69,9 @@ export default function ProgressBoard() {
   const [only, setOnly] = useState("");   // "" | "fees" | "attendance" | "grades"
   const [shown, setShown] = useState(PAGE);
   const ys = useAcademicYears();
-  const [year, setYear] = useState("");
+  const [ownYear, setYear] = useState("");
+  const controlled = yearProp !== undefined;
+  const year = controlled ? yearProp : ownYear;
 
   useEffect(() => {
     api.get("/dashboard/overview", { params: { academic_year: year || undefined } }).then((r) => {
@@ -121,7 +123,7 @@ export default function ProgressBoard() {
 
   return (
     <section className="space-y-5" data-testid="progress-board">
-      <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => { setYear(y === ys.current ? "" : y); setShown(PAGE); }} />
+      {!controlled && <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => { setYear(y === ys.current ? "" : y); setShown(PAGE); }} />}
       <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="ui-card p-5" data-testid="class-summary">
           <div className="space-y-3">

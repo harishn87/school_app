@@ -36,9 +36,9 @@ export default function RagRing({ items, centreLabel, centreValue, noun = "class
             const a0 = -90 + step * i - step / 2 + GAP / 2, a1 = a0 + step - GAP, mid = (a0 + a1) / 2, on = hover === i;
             const st = r.has ? r.status : "none";
             const rr = (R_IN + R_OUT) / 2 + 4, tx = C + rr * Math.cos(rad(mid)), ty = C + rr * Math.sin(rad(mid));
-            const dx = on ? 6 * Math.cos(rad(mid)) : 0, dy = on ? 6 * Math.sin(rad(mid)) : 0;
+            const dx = 0, dy = 0;
             return (
-              <g key={r.key} transform={`translate(${dx},${dy})`} style={{ transition: "transform .15s", cursor: onSelect ? "pointer" : "default" }} opacity={hover == null || on ? 1 : 0.6}
+              <g key={r.key} transform={`translate(${dx},${dy})`} style={{ cursor: onSelect ? "pointer" : "default" }} opacity={1}
                 tabIndex={0} role={onSelect ? "button" : undefined} data-testid={`${testid}-seg-${r.key}`} onMouseEnter={() => setHover(i)} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
                 onClick={() => onSelect?.(r)} onKeyDown={(e) => { if (onSelect && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onSelect(r); } }}
                 aria-label={`${r.label}: ${r.has ? `${r.percent}% covered, ${RAG[st].label}` : "syllabus not set up"}`}>

@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import PageHero from "@/components/PageHero";
 import Modal from "@/components/Modal";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -224,10 +225,10 @@ export default function FeesPage() {
                 <input type="number" min={0} step="0.01" className="ui-input" value={form.paid_amount} onChange={(e) => setForm({ ...form, paid_amount: e.target.value })} />
               </Field>
               <Field label="Due date">
-                <input type="date" className="ui-input" value={form.due_date || ""} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
+                <DateField className="ui-input" value={form.due_date || ""} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
               </Field>
               <Field label="Paid date">
-                <input type="date" className="ui-input" value={form.paid_date || ""} onChange={(e) => setForm({ ...form, paid_date: e.target.value })} />
+                <DateField className="ui-input" value={form.paid_date || ""} onChange={(e) => setForm({ ...form, paid_date: e.target.value })} />
               </Field>
             </div>
             <Field label="Note">

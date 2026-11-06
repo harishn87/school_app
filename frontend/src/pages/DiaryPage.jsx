@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import PageHero from "@/components/PageHero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
@@ -171,7 +172,7 @@ export default function DiaryPage() {
                       {kind === "homework" && (
                         <div>
                           <label className="field-label" htmlFor={`d-due-${i}`}>Due date</label>
-                          <input id={`d-due-${i}`} type="date" data-testid={`diary-due-${i}`} className="ui-input mt-1.5" value={r.due_date}
+                          <DateField id={`d-due-${i}`} data-testid={`diary-due-${i}`} className="ui-input mt-1.5" value={r.due_date}
                             onChange={(e) => setRow(i, { due_date: e.target.value })} />
                         </div>
                       )}

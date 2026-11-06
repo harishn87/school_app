@@ -20,7 +20,7 @@ function Card({ title, sub, children, testid, innerRef }) {
   return (
     <section className="ui-card p-5" data-testid={testid} ref={innerRef}>
       <h2 className="font-display text-lg font-semibold text-[#0B1020]">{title}</h2>
-      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 mt-0.5 min-h-[2rem]">{sub}</p>}
       <div className="mt-4">{children}</div>
     </section>
   );
@@ -155,7 +155,7 @@ export default function ManagementDashboard() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         <Card title="Class wheel" sub={metricInfo[1]} testid="wheel-classes" innerRef={classWheelRef}>
-          <div className="flex flex-wrap gap-2 mb-2" role="group" aria-label="Wheel metric">
+          <div className="flex flex-wrap content-end gap-2 mb-2 min-h-[4rem]" role="group" aria-label="Wheel metric">
             {[["attendance", "Attendance"], ["grade", "Grades"], ["fees", "Fee collection"], ...(subjMetric ? [[metric, subjMetric]] : [])].map(([k, l]) => (
               <button key={k} type="button" onClick={() => setMetric(k)} aria-pressed={metric === k} data-testid={`metric-${k}`}
                 className={`pill ${metric === k ? "bg-[#2B4BFF] text-white" : "bg-[#F1F4FF] text-[#3A4160]"} px-3 py-1 text-xs font-medium rounded-full`}>{l}</button>
@@ -164,7 +164,7 @@ export default function ManagementDashboard() {
           <WagonWheel items={wheel} title={metricInfo[0]} testid="wheel-class-chart" onSelect={(it) => navigate(`/app/classes/${it.id}`)} hint="Click a class to open it." />
         </Card>
         <Card title="Subject wheel" sub="Average marks per subject." testid="wheel-subjects">
-          <label className="block max-w-[220px] mb-2"><span className="field-label">Class</span>
+          <label className="flex flex-col justify-end max-w-[220px] mb-2 min-h-[4rem]"><span className="field-label">Class</span>
             <select className="ui-input mt-1" value={subjClass} onChange={(e) => setSubjClass(e.target.value)} data-testid="subject-class">
               <option value="">Whole school</option>{classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select></label>

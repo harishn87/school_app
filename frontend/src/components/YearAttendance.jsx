@@ -85,27 +85,38 @@ export default function YearAttendance({ classId = "", studentId = "" }) {
         )}
 
         {d.school_days > 0 && !studentId && !classId && d.classes.length > 1 && (
-          <div className="overflow-x-auto" data-testid="year-classes">
-            <table className="w-full text-sm">
-              <thead><tr className="table-head">
-                <th scope="col" className="px-3 py-2 text-left">Class</th>
-                <th scope="col" className="px-3 py-2 text-right">Present</th>
-                <th scope="col" className="px-3 py-2 text-right">Late</th>
-                <th scope="col" className="px-3 py-2 text-right">Absent</th>
-                <th scope="col" className="px-3 py-2 text-right">Attendance</th>
-              </tr></thead>
-              <tbody>
-                {d.classes.map((c) => (
-                  <tr key={c.class_id || "none"} className="border-b border-slate-100">
-                    <td className="px-3 py-2 font-medium">{c.class_name}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.present}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.late}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{c.absent}</td>
-                    <td className="px-3 py-2 text-right tabular-nums font-semibold">{c.percent == null ? "—" : `${c.percent}%`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div data-testid="year-classes">
+            <div className="flex items-end justify-between gap-2 mb-3">
+              <h3 className="font-heading text-base font-semibold">Class by class</h3>
+              <span className="text-xs text-slate-500">Ranked by attendance</span>
+            </div>
+            <ul className="space-y-2">
+              {[...d.classes].sort((x, y) => (y.percent ?? -1) - (x.percent ?? -1) || String(x.class_name).localeCompare(String(y.class_name), undefined, { numeric: true })).map((c, i) => {
+                const n = c.present + c.late + c.absent;
+                const w = (v) => (n ? `${(v / n) * 100}%` : "0%");
+                const pc = c.percent;
+                const tone = pc == null ? "bg-slate-100 text-slate-500" : pc >= 94 ? "bg-emerald-50 text-emerald-700" : pc >= 90 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700";
+                return (
+                  <li key={c.class_id || "none"} className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-xl border border-[#E7E9F1] bg-gradient-to-r from-white to-[#F7F8FF] px-3.5 py-3 transition-colors hover:border-[#2B4BFF]/30 sm:grid-cols-[auto_minmax(110px,1fr)_minmax(140px,2fr)_auto_auto]">
+                    <span className={`grid h-8 w-8 place-items-center rounded-lg text-xs font-bold ${i === 0 ? "bg-[#E9C46A] text-[#0B1020]" : i === 1 ? "bg-slate-200 text-slate-700" : i === 2 ? "bg-amber-100 text-amber-800" : "bg-[#EEF1FF] text-[#2B4BFF]"}`}>{i + 1}</span>
+                    <span className="min-w-0 truncate font-heading font-semibold text-[#0B1020]">{c.class_name}</span>
+                    <div className="order-last col-span-3 sm:order-none sm:col-span-1" aria-hidden="true">
+                      <div className="flex h-2.5 overflow-hidden rounded-full bg-slate-100 gap-px">
+                        <div className="bg-emerald-500" style={{ width: w(c.present) }} />
+                        <div className="bg-amber-400" style={{ width: w(c.late) }} />
+                        <div className="bg-rose-500" style={{ width: w(c.absent) }} />
+                      </div>
+                    </div>
+                    <div className="hidden items-center gap-1.5 text-xs font-semibold tabular-nums sm:flex">
+                      <span className="rounded-md bg-emerald-50 px-2 py-1 text-emerald-700" title="Present">{c.present}<span className="ml-0.5 font-normal opacity-70">P</span></span>
+                      <span className="rounded-md bg-amber-50 px-2 py-1 text-amber-700" title="Late">{c.late}<span className="ml-0.5 font-normal opacity-70">L</span></span>
+                      <span className="rounded-md bg-rose-50 px-2 py-1 text-rose-700" title="Absent">{c.absent}<span className="ml-0.5 font-normal opacity-70">A</span></span>
+                    </div>
+                    <span className={`min-w-[3.75rem] rounded-full px-3 py-1 text-center font-heading text-sm font-semibold tabular-nums ${tone}`}>{pc == null ? "—" : `${pc}%`}</span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         )}
       </>)}

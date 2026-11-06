@@ -38,7 +38,7 @@ export default function WagonWheel({ items, unit = "%", title, testid, onSelect,
   const h = hover != null ? items[hover] : null;
 
   return (
-    <div data-testid={testid}>
+    <div data-testid={testid} className="w-full">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2 text-xs text-slate-600" data-testid={testid ? `${testid}-legend` : undefined}>
           <span>Lower</span>
@@ -74,16 +74,16 @@ export default function WagonWheel({ items, unit = "%", title, testid, onSelect,
               const tx = C + rr * Math.cos(rad(mid)), ty = C + rr * Math.sin(rad(mid));
               const dark = col ? lum(col) < 0.55 : false;
               const ink = col ? (dark ? "#fff" : "#0B1020") : "#4A5273";
-              const dx = on ? 6 * Math.cos(rad(mid)) : 0, dy = on ? 6 * Math.sin(rad(mid)) : 0;
+              const dx = 0, dy = 0; // no pop-out: the wheel must not move or grow under the cursor
               return (
-                <g key={i} transform={`translate(${dx},${dy})`} style={{ transition: "transform .15s", cursor: onSelect ? "pointer" : "default" }} opacity={hover == null || on ? 1 : 0.55}
+                <g key={i} transform={`translate(${dx},${dy})`} style={{ cursor: onSelect ? "pointer" : "default" }} opacity={1}
                   onMouseEnter={() => setHover(i)} tabIndex={0} onFocus={() => setHover(i)} onBlur={() => setHover(null)}
                   role={onSelect ? "button" : undefined} data-testid={testid ? `${testid}-seg-${i}` : undefined}
                   onClick={onSelect ? () => onSelect(it, i) : undefined}
                   onKeyDown={onSelect ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(it, i); } } : undefined}
                   aria-label={`${it.label} ${it.value ?? "no data"}${it.value == null ? "" : unit}${onSelect ? ". Click to open" : ""}`}>
                   <path d={sector(a0, a1, R_IN, R_OUT)} fill={col ? rgb(col) : `url(#${testid || "ww"}-hatch)`} stroke={activeLabel === it.label ? "#E9C46A" : "#fff"} strokeWidth={activeLabel === it.label ? 4 : 2.5} strokeLinejoin="round"
-                    filter={on ? `url(#${testid || "ww"}-lift)` : undefined} />
+                    />
                   <text x={tx} y={ty - (it.value == null ? 0 : 9)} textAnchor="middle" dominantBaseline="middle" fontSize={fs} fontWeight="600" fill={ink} style={{ pointerEvents: "none" }}>{it.label}</text>
                   <text x={tx} y={ty + 10} textAnchor="middle" dominantBaseline="middle" fontSize={fsv} fontWeight="700" fill={ink} style={{ pointerEvents: "none" }}>
                     {it.value == null ? "" : `${it.value}${unit}`}

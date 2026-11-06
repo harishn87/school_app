@@ -11,6 +11,7 @@ import ParentQuestions from "@/components/ParentQuestions";
 import ProgressBoard from "@/components/ProgressBoard";
 import SyllabusWheel from "@/components/SyllabusWheel";
 import { useSyllabusSummary } from "@/components/Syllabus";
+import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 
 function Ring({ pct }) {
   const r = 52, c = 2 * Math.PI * r, v = Math.max(0, Math.min(100, pct || 0));
@@ -40,17 +41,19 @@ export default function DashboardHome() {
   const [stats, setStats] = useState({});
   const [loaded, setLoaded] = useState(false);
   const live = useLive(30000);
-  const { data: syl } = useSyllabusSummary(live);
+  const ys = useAcademicYears();
+  const [year, setYear] = useState("");   // "" = current year
+  const { data: syl } = useSyllabusSummary(live, year);
 
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get("/dashboard/stats");
+        const { data } = await api.get("/dashboard/stats", { params: { academic_year: year || undefined } });
         setStats(data);
       } catch (_e) { /* ignore */ }
       setLoaded(true);
     })();
-  }, [live]);
+  }, [live, year]);
 
   const parent = user?.role === "parent";
   const teacher = user?.role === "teacher";
@@ -74,6 +77,10 @@ export default function DashboardHome() {
         </div>
         <div className="text-sm text-slate-500">{today}</div>
       </header>
+
+      {user?.role === "admin" && (
+        <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} />
+      )}
 
       <div data-testid="stats-grid" className="space-y-6">
         {!parent && (
@@ -155,7 +162,7 @@ export default function DashboardHome() {
 
       {teacher && <ParentQuestions />}
 
-      {!parent && <ProgressBoard />}
+      {!parent && <ProgressBoard {...(user?.role === "admin" ? { year } : {})} />}
 
       {!parent && syl && syl.classes.length > 0 && (
         <SyllabusWheel data={syl} showTeacher={!teacher} testid="syllabus-board"

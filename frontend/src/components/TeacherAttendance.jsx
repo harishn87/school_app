@@ -1,3 +1,4 @@
+import DateField from "@/components/DateField";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, XCircle, Clock, Save, Search, Users, ChevronRight } from "lucide-react";
@@ -80,7 +81,7 @@ export default function TeacherAttendance() {
 
   const dateField = (
     <label className="block"><span className="field-label">Date</span>
-      <input type="date" className="ui-input mt-1" max={today} value={date} onChange={(e) => setParam("date", e.target.value === today ? "" : e.target.value)} data-testid="ta-date" /></label>
+      <DateField className="ui-input mt-1" max={today} value={date} onChange={(e) => setParam("date", e.target.value === today ? "" : e.target.value)} data-testid="ta-date" /></label>
   );
 
   // ---------- step 1: pick one of my classes ----------

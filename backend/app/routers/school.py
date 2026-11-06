@@ -402,10 +402,10 @@ async def list_attendance(date_str: Optional[str] = Query(None, alias="date"), c
 
 # ---------- dashboard ----------
 @router.get("/dashboard/stats")
-async def dashboard_stats(ctx: TenantContext = Depends(get_ctx)):
+async def dashboard_stats(academic_year: Optional[str] = Query(None, max_length=20), ctx: TenantContext = Depends(get_ctx)):
     scope = await scope_for(ctx)
     ids = await visible_student_ids(ctx)
-    fee_q = {**year_q(), **({} if ids is None else {"student_id": {"$in": ids}})}
+    fee_q = {**year_q(academic_year or None), **({} if ids is None else {"student_id": {"$in": ids}})}
 
     total_students = await ctx.db.students.count_documents({**scope, "status": "active"})
     total_left = await ctx.db.students.count_documents({**scope, "status": "left"})

@@ -165,6 +165,8 @@ function StaffProgress() {
           <Save className="h-4 w-4" aria-hidden="true" /> {saving ? "Saving…" : dirty ? "Save and publish" : "Save"}
         </button>} />
 
+      {view === "analysis" && <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} id="pr-year" />}
+
       {canEnter && <div className="inline-flex rounded-xl bg-slate-100 p-1" role="tablist" aria-label="Academics views">
         {[["marks", "Enter marks"], ["analysis", "Student analysis"]].map(([k, l]) => (
           <button key={k} type="button" role="tab" aria-selected={view === k} data-testid={`pr-tab-${k}`} onClick={() => setView(k)}
@@ -181,7 +183,7 @@ function StaffProgress() {
         </form>
       </div>}
 
-      {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}<YearSelect years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => setYear(y === ys.current ? "" : y)} id="pr-year" /></>} year={year} cols={4} />}
+      {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}</>} year={year} cols={4} />}
 
       {view === "marks" && <div className="ui-card overflow-x-auto">
         <table className="w-full text-sm" data-testid="progress-table">

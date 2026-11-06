@@ -136,3 +136,49 @@ a.ui-card:hover, .ui-card.hoverable:hover { box-shadow: 0 2px 4px rgba(15,21,48,
 .ui-card table tbody tr:nth-child(4) { animation-delay: .11s; } .ui-card table tbody tr:nth-child(5) { animation-delay: .14s; } .ui-card table tbody tr:nth-child(6) { animation-delay: .17s; }
 .ui-card table tbody tr:nth-child(n+7) { animation-delay: .2s; }
 .nav-active-glow { box-shadow: 0 0 0 1px rgba(233,196,106,.25), 0 10px 24px -12px rgba(43,75,255,.6); }
+
+/* Chart segments are keyboard-focusable. Mouse clicks must not draw the browser's square focus box around them;
+   keyboard focus still gets a clear glow that follows the shape. */
+svg [tabindex]:focus { outline: none; }
+svg [tabindex]:focus-visible { outline: none; filter: drop-shadow(0 0 3px rgba(43, 75, 255, .9)); }
+
+/* ---- Premium dropdowns: every list field matches the Academic year picker ---- */
+select.ui-input {
+  -webkit-appearance: none; appearance: none; cursor: pointer;
+  background-color: #fff;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%232B4BFF' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"),
+    linear-gradient(90deg, #EEF1FF 0%, #FFFFFF 55%, #FFF7E0 100%);
+  background-repeat: no-repeat, no-repeat;
+  background-position: right 0.85rem center, 0 0;
+  background-size: 16px 16px, 100% 100%;
+  border: 1px solid rgba(43, 75, 255, 0.22);
+  border-radius: 0.85rem;
+  padding: 0.6rem 2.5rem 0.6rem 0.95rem;
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-weight: 600; font-size: 0.9rem; color: #0B1020;
+  box-shadow: 0 6px 18px -12px rgba(43, 75, 255, 0.55);
+}
+select.ui-input:hover { border-color: rgba(43, 75, 255, 0.45); }
+select.ui-input:focus { border-color: #2B4BFF; box-shadow: 0 0 0 4px rgba(43, 75, 255, 0.12); }
+select.ui-input:disabled { opacity: .6; cursor: not-allowed; }
+.page-hero select.ui-input { background-color: #fff; }
+/* labels sitting above a list field: small blue caps, like the year picker */
+.field-label:has(+ select.ui-input), label:has(> select.ui-input) > .field-label, div:has(> select.ui-input) > .field-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #2B4BFF;
+}
+
+/* Date fields share the premium dropdown look */
+button.date-field.ui-input {
+  cursor: pointer;
+  background-image: linear-gradient(90deg, #EEF1FF 0%, #FFFFFF 55%, #FFF7E0 100%);
+  border: 1px solid rgba(43, 75, 255, 0.22);
+  border-radius: 0.85rem;
+  padding: 0.6rem 0.95rem;
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-weight: 600; font-size: 0.9rem; color: #0B1020;
+  box-shadow: 0 6px 18px -12px rgba(43, 75, 255, 0.55);
+}
+button.date-field.ui-input:hover { border-color: rgba(43, 75, 255, 0.45); }
+button.date-field.ui-input:focus-visible, button.date-field.ui-input[aria-expanded="true"] { border-color: #2B4BFF; box-shadow: 0 0 0 4px rgba(43, 75, 255, 0.12); outline: none; }
+button.date-field.ui-input:disabled { opacity: .6; cursor: not-allowed; }
