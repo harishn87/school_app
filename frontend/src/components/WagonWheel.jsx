@@ -28,7 +28,7 @@ export default function WagonWheel({ items, unit = "%", title, testid, onSelect,
   const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
   const min = vals.length ? Math.min(...vals) : 0, max = vals.length ? Math.max(...vals) : 0;
   const shade = (v) => (v == null ? null : mix(max === min ? 0.7 : 0.12 + 0.88 * ((v - min) / (max - min))));
-  const named = (v) => items.filter((i) => i.value === v).map((i) => i.label).join(", ");
+  const named = (v) => { const l = items.filter((i) => i.value === v).map((i) => i.label); return l.length > 2 ? `${l.slice(0, 2).join(", ")} +${l.length - 2} more` : l.join(", "); };
   const diff = (v) => (v == null || avg == null ? "" : v === avg ? "same as the average" : `${Math.abs(v - avg)} ${v > avg ? "above" : "below"} the average`);
 
   if (n < 3) return <p className="text-sm text-slate-500 py-8 text-center">A wheel needs at least three {title?.toLowerCase().includes("subject") ? "subjects" : "classes"} with data.</p>;
@@ -105,7 +105,7 @@ export default function WagonWheel({ items, unit = "%", title, testid, onSelect,
       )}
 
       {!asTable && (
-        <p className="mt-2 text-center text-sm text-slate-600 min-h-[2.75rem]" data-testid={testid ? `${testid}-summary` : undefined} aria-live="polite">
+        <p className="mt-2 text-center text-sm text-slate-600 min-h-[3.75rem]" data-testid={testid ? `${testid}-summary` : undefined} aria-live="polite">
           {h ? (
             <span data-testid="wheel-tip"><b className="text-slate-900">{h.label}</b>: {h.value == null ? "no data yet" : `${h.value}${unit}, ${diff(h.value)}`}{onSelect ? <span className="text-[#2B4BFF]"> · click to open</span> : null}</span>
           ) : vals.length > 1 && max !== min ? (
@@ -113,7 +113,7 @@ export default function WagonWheel({ items, unit = "%", title, testid, onSelect,
           ) : null}
         </p>
       )}
-      {!asTable && max !== min && <p className="text-center text-xs text-slate-500">Shading runs from the lowest ({min}{unit}) to the highest ({max}{unit}) value shown.</p>}
+      {!asTable && <p className="text-center text-xs text-slate-500 min-h-[2rem]">{max !== min ? `Shading runs from the lowest (${min}${unit}) to the highest (${max}${unit}) value shown.` : ""}</p>}
     </div>
   );
 }

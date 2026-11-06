@@ -46,7 +46,7 @@ export default function StaffPerformancePage() {
   const avg = (k) => { const v = teachers.map((t) => val(t, k)).filter((x) => x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null; };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="staff-performance-page">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-up" data-testid="staff-performance-page">
       <PageHero title="Staff performance" subtitle="How each teacher's classes are doing: results, attendance, marks entry, diary and syllabus coverage. Click a wing of the wheel to see that teacher's detail." />
       <YearSelect chips years={ys.years} current={ys.current} value={yr} onChange={setYear} id="sp-year" />
 
@@ -69,16 +69,18 @@ export default function StaffPerformancePage() {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] gap-5 items-start">
-          <div className="ui-card p-5" data-testid="sp-wheel-card">
+        <div className="grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-5 items-stretch">
+          <div className="ui-card p-5 flex flex-col" data-testid="sp-wheel-card">
             <h2 className="font-heading text-xl font-semibold">{m.label} by teacher</h2>
             <p className="text-xs text-slate-500 mt-0.5 mb-3">{m.note}</p>
-            <WagonWheel items={items} title="Teacher wheel" testid="sp-wheel" activeLabel={sel ? items.find((i) => i.id === sel.id)?.label : undefined}
-              onSelect={(it) => setPick(it.id)} hint="Click a wing to open that teacher." />
+            <div className="flex-1 grid place-items-center">
+              <WagonWheel items={items} title="Teacher wheel" testid="sp-wheel" activeLabel={sel ? items.find((i) => i.id === sel.id)?.label : undefined}
+                onSelect={(it) => setPick(it.id)} hint="Click a wing to open that teacher." />
+            </div>
           </div>
 
           {sel && (
-            <div className="ui-card p-5 space-y-5" data-testid="sp-detail" key={sel.id} style={{ animation: "slide-in .4s ease-out" }}>
+            <div className="ui-card p-5 flex flex-col gap-5" data-testid="sp-detail" key={sel.id} style={{ animation: "slide-in .4s ease-out" }}>
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl grid place-items-center bg-gradient-to-br from-[#0B1020] to-[#2B4BFF] text-white font-heading text-lg font-semibold shrink-0">{initials(sel.name)}</div>
                 <div className="min-w-0 flex-1">
@@ -103,60 +105,86 @@ export default function StaffPerformancePage() {
                 )}
               </div>
 
-              <div className="space-y-3.5">
+              <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4">
                 {METRICS.slice(1).map((x) => {
                   const v = sel.metrics[x.key];
                   return (
                     <div key={x.key} title={x.note}>
                       <div className="flex justify-between text-sm"><span>{x.label} <span className="text-[11px] text-slate-400">· weight {data.weights[x.key]}%</span></span><span className={`font-semibold tabular-nums ${tone(v)}`}>{v == null ? "No data" : `${v}%`}</span></div>
-                      <div className="mt-1 h-2.5 rounded-full bg-slate-100 overflow-hidden"><div className="h-full rounded-full anim-grow bg-gradient-to-r from-[#2B4BFF] to-[#6C86FF]" style={{ width: `${v || 0}%` }} /></div>
+                      <div className="relative mt-1 h-2.5 rounded-full bg-slate-100">
+                        <div className="h-full rounded-full anim-grow bg-gradient-to-r from-[#2B4BFF] to-[#6C86FF]" style={{ width: `${v || 0}%` }} />
+                        {avg(x.key) != null && <i className="absolute -top-0.5 h-3.5 w-0.5 bg-slate-900/70" style={{ left: `${avg(x.key)}%` }} title={`School average ${avg(x.key)}%`} aria-hidden="true" />}
+                      </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div data-testid="sp-syllabus">
-                <div className="flex items-baseline justify-between">
-                  <h4 className="font-heading text-base font-semibold">Syllabus covered, class by class</h4>
-                  <span className="text-[11px] text-slate-500">blue = this teacher&apos;s subjects</span>
-                </div>
-                <div className="mt-2 space-y-2.5">
-                  {sel.classes.map((c) => {
-                    const y = c.syllabus?.year || {}; const st = y.percent == null ? "none" : y.status;
-                    return (
-                      <Link key={c.id} to={`/app/syllabus?class=${c.id}&term=Whole%20year`} className="block rounded-xl border border-[#E8EBF3] p-3 hover:shadow-md hover:border-slate-300 transition" data-testid={`sp-syl-${c.id}`}>
-                        <div className="flex items-center justify-between gap-2 text-sm">
-                          <span className="font-medium inline-flex items-center gap-2"><i className={`h-2.5 w-2.5 rounded-full ${DOT[st]}`} aria-hidden="true" />{c.name} <span className="text-[11px] font-normal text-slate-400">· {c.role}</span></span>
-                          <span className="tabular-nums"><b className={{ green: "text-emerald-600", amber: "text-amber-600", red: "text-rose-600", none: "text-slate-400" }[st]}>{y.percent == null ? "—" : `${y.percent}%`}</b> <span className="text-[11px] text-slate-500">{WORD[st]}</span></span>
-                        </div>
-                        <div className="relative mt-1.5 h-2.5 rounded-full bg-slate-100">
-                          <div className={`h-full rounded-full ${st === "none" ? "bg-slate-300" : st === "green" ? "bg-emerald-500" : st === "amber" ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${y.percent || 0}%` }} />
-                          {y.target != null && <i className="absolute -top-0.5 h-3.5 w-0.5 bg-slate-900" style={{ left: `${y.target}%` }} aria-hidden="true" />}
-                        </div>
-                        <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                          {(c.syllabus?.terms || []).map((t) => (
-                            <div key={t.term} className="rounded-lg bg-[#F6F7FB] px-2 py-1.5">
-                              <div className="text-slate-500 inline-flex items-center gap-1.5"><i className={`h-2 w-2 rounded-full ${DOT[t.status]}`} aria-hidden="true" />{t.term}</div>
-                              <div className="font-semibold tabular-nums">{t.percent == null ? "Not set up" : `${t.percent}%`}</div>
-                            </div>
-                          ))}
-                        </div>
-                        {(c.syllabus?.subjects || []).length > 0 && (
-                          <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`sp-subjects-${c.id}`}>
-                            {c.syllabus.subjects.map((x) => {
-                              const mine = (c.syllabus.mine || []).some((m) => m.name === x.name);
-                              return <span key={x.name} className={`rounded-lg px-2 py-1 text-xs ${mine ? "bg-[#E8ECFF] text-[#2B4BFF] font-medium" : "bg-slate-100 text-slate-600"}`} title={mine ? "Taught by this teacher" : `Taught by ${x.teacher || "another teacher"}`}>{x.name} {x.percent}%{!mine && x.teacher ? <span className="text-slate-400"> · {x.teacher.split(" ")[0]}</span> : null}</span>;
-                            })}
-                          </div>)}
-                      </Link>
-                    );
-                  })}
-                </div>
+              <div className="text-[11px] text-slate-500 -mt-2">The dark tick on each bar is the school average.</div>
+
+              {(() => {
+                const have = METRICS.slice(1).filter((x) => sel.metrics[x.key] != null).sort((a, b) => sel.metrics[b.key] - sel.metrics[a.key]);
+                if (have.length < 2) return null;
+                const hi = have[0], lo = have[have.length - 1];
+                return (
+                  <div className="grid sm:grid-cols-2 gap-3" data-testid="sp-highlights">
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-3"><div className="text-xs text-emerald-700 font-medium">Strongest</div><div className="font-medium mt-0.5">{hi.label} <span className="font-semibold tabular-nums text-emerald-700">{sel.metrics[hi.key]}%</span></div></div>
+                    <div className="rounded-xl border border-rose-100 bg-rose-50/60 px-3.5 py-3"><div className="text-xs text-rose-700 font-medium">Needs attention</div><div className="font-medium mt-0.5">{lo.label} <span className="font-semibold tabular-nums text-rose-700">{sel.metrics[lo.key]}%</span></div></div>
+                  </div>
+                );
+              })()}
+
+              <div className="mt-auto grid grid-cols-3 gap-3" data-testid="sp-facts">
+                {[["Rank", `#${[...teachers].sort((a, b) => (b.overall ?? -1) - (a.overall ?? -1)).findIndex((t) => t.id === sel.id) + 1} of ${teachers.length}`],
+                  ["Report cards entered", sel.reports],
+                  ["Diary days", sel.diary_days]].map(([k, v]) => (
+                  <div key={k} className="rounded-xl bg-[#F6F7FB] px-3 py-2.5"><div className="text-xs text-slate-500">{k}</div><div className="font-heading text-xl font-semibold tabular-nums">{v}</div></div>
+                ))}
               </div>
-              <div className="text-xs text-slate-500">{sel.reports} report cards entered · diary posted on {sel.diary_days} {sel.diary_days === 1 ? "day" : "days"}</div>
             </div>
           )}
         </div>
+
+        {sel && (
+          <section className="ui-card p-5" data-testid="sp-syllabus" key={`syl-${sel.id}`}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="font-heading text-xl font-semibold">Syllabus covered, class by class <span className="text-base font-normal text-slate-500">· {sel.name}</span></h2>
+              <span className="text-[11px] text-slate-500">blue = this teacher&apos;s subjects</span>
+            </div>
+            <div className="mt-3 grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {sel.classes.map((c) => {
+                const y = c.syllabus?.year || {}; const st = y.percent == null ? "none" : y.status;
+                return (
+                  <Link key={c.id} to={`/app/syllabus?class=${c.id}&term=Whole%20year`} className="block rounded-xl border border-[#E8EBF3] p-3.5 hover:shadow-md hover:border-slate-300 transition" data-testid={`sp-syl-${c.id}`}>
+                    <div className="flex items-center justify-between gap-2 text-sm">
+                      <span className="font-medium inline-flex items-center gap-2"><i className={`h-2.5 w-2.5 rounded-full ${DOT[st]}`} aria-hidden="true" />{c.name} <span className="text-[11px] font-normal text-slate-400">· {c.role}</span></span>
+                      <span className="tabular-nums"><b className={{ green: "text-emerald-600", amber: "text-amber-600", red: "text-rose-600", none: "text-slate-400" }[st]}>{y.percent == null ? "—" : `${y.percent}%`}</b> <span className="text-[11px] text-slate-500">{WORD[st]}</span></span>
+                    </div>
+                    <div className="relative mt-1.5 h-2.5 rounded-full bg-slate-100">
+                      <div className={`h-full rounded-full ${st === "none" ? "bg-slate-300" : st === "green" ? "bg-emerald-500" : st === "amber" ? "bg-amber-400" : "bg-rose-500"}`} style={{ width: `${y.percent || 0}%` }} />
+                      {y.target != null && <i className="absolute -top-0.5 h-3.5 w-0.5 bg-slate-900" style={{ left: `${y.target}%` }} aria-hidden="true" />}
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+                      {(c.syllabus?.terms || []).map((t) => (
+                        <div key={t.term} className="rounded-lg bg-[#F6F7FB] px-2 py-1.5">
+                          <div className="text-slate-500 inline-flex items-center gap-1.5"><i className={`h-2 w-2 rounded-full ${DOT[t.status]}`} aria-hidden="true" />{t.term}</div>
+                          <div className="font-semibold tabular-nums">{t.percent == null ? "Not set up" : `${t.percent}%`}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {(c.syllabus?.subjects || []).length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-1.5" data-testid={`sp-subjects-${c.id}`}>
+                        {c.syllabus.subjects.map((x) => {
+                          const mine = (c.syllabus.mine || []).some((m) => m.name === x.name);
+                          return <span key={x.name} className={`rounded-lg px-2 py-1 text-xs ${mine ? "bg-[#E8ECFF] text-[#2B4BFF] font-medium" : "bg-slate-100 text-slate-600"}`} title={mine ? "Taught by this teacher" : `Taught by ${x.teacher || "another teacher"}`}>{x.name} {x.percent}%{!mine && x.teacher ? <span className="text-slate-400"> · {x.teacher.split(" ")[0]}</span> : null}</span>;
+                        })}
+                      </div>)}
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
 
         <div className="ui-card overflow-hidden" data-testid="sp-table">
           <div className="overflow-x-auto">

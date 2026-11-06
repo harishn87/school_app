@@ -124,12 +124,12 @@ export default function ProgressBoard() {
       <YearSelect chips years={ys.years} current={ys.current} value={year || ys.current} onChange={(y) => { setYear(y === ys.current ? "" : y); setShown(PAGE); }} />
       <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] gap-5 items-start">
         <div className="ui-card p-5" data-testid="class-summary">
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-3">
             <div>
               <h2 className="font-heading text-xl font-semibold">Classes at a glance</h2>
-              <p className="text-xs text-slate-500 mt-0.5">{sub} Click a class to open it.</p>
+              <p className="text-xs text-slate-500 mt-0.5 min-h-[2rem]">{sub} Click a class to open it.</p>
             </div>
-            <div className="flex gap-1.5" role="group" aria-label="Wheel metric">
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Wheel metric">
               {metrics.map(([k, l]) => (
                 <button key={k} type="button" onClick={() => setMetric(k)} aria-pressed={metric === k} data-testid={`ov-metric-${k}`}
                   className={`pill px-3 py-1 text-xs font-medium ${metric === k ? "bg-[#2B4BFF] text-white" : "bg-[#F1F4FF] text-[#3A4160]"}`}>{l}</button>
