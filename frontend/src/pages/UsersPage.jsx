@@ -1,7 +1,7 @@
 import PageHero from "@/components/PageHero";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Plus, KeyRound, Trash2 } from "lucide-react";
+import { Plus, KeyRound, Trash2, Search } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
@@ -18,6 +18,8 @@ export default function UsersPage() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [uq, setUq] = useState("");
+  const [urole, setUrole] = useState("");
   const [resetFor, setResetFor] = useState(null);
   const [form, setForm] = useState({ name: "", email: "", role: "teacher", password: "" });
   const [newPassword, setNewPassword] = useState("");
@@ -77,6 +79,13 @@ export default function UsersPage() {
           <Plus className="h-4 w-4" aria-hidden="true" /> Add user
         </button>} />
 
+      <div className="ui-card p-4 grid grid-cols-1 sm:grid-cols-3 gap-3" data-testid="users-filters">
+        <div className="relative sm:col-span-2"><Search className="h-4 w-4 absolute left-3 top-3.5 text-slate-400" aria-hidden="true" />
+          <input className="ui-input pl-9" placeholder="Search name or email…" value={uq} onChange={(e) => setUq(e.target.value)} aria-label="Search users" data-testid="users-search" /></div>
+        <select className="ui-input" value={urole} onChange={(e) => setUrole(e.target.value)} aria-label="Role" data-testid="users-role-filter">
+          <option value="">All roles</option><option value="admin">Admins</option><option value="teacher">Teachers</option><option value="parent">Parents</option></select>
+      </div>
+
       <div className="ui-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
@@ -87,7 +96,7 @@ export default function UsersPage() {
             </tr>
           </thead>
           <tbody>
-            {users.map((u) => {
+            {users.filter((u) => (!urole || u.role === urole) && (!uq.trim() || `${u.name} ${u.email}`.toLowerCase().includes(uq.trim().toLowerCase()))).map((u) => {
               const self = u.id === me?.id;
               return (
                 <tr key={u.id} className="border-b border-slate-100" data-testid={`user-row-${u.email}`}>

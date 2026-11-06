@@ -8,6 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import MovementWheel from "@/components/MovementWheel";
 import YearSelect, { useAcademicYears } from "@/components/YearSelect";
 import StudentFormModal from "@/components/StudentFormModal";
+import Pager, { pageOf } from "@/components/Pager";
+import { formatDate } from "@/lib/utils";
 
 export default function StudentsPage() {
   const { user } = useAuth();
@@ -20,6 +22,7 @@ export default function StudentsPage() {
   const [classFilter, setClassFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [page, setPage] = useState(1);
   const [params, setParams] = useSearchParams();
   const move = params.get("move") || "";
   const ys = useAcademicYears();
@@ -71,13 +74,20 @@ export default function StudentsPage() {
     return everyone.filter((s) => ids.has(s.id) && (!classFilter || s.class_id === classFilter)
       && (!needle || `${s.first_name} ${s.last_name} ${s.roll_number || ""} ${s.guardian_name || ""}`.toLowerCase().includes(needle)));
   }, [move, mv, everyone, q, classFilter]);
-  const rows = moveRows || students;
+  // Active students first (newest first inside each group); students who left follow.
+  const ordered = useMemo(() => {
+    const base = moveRows || students;
+    return moveRows ? base : [...base].sort((a, b) => (a.status === "active" ? 0 : 1) - (b.status === "active" ? 0 : 1));
+  }, [moveRows, students]);
+  useEffect(() => { setPage(1); }, [q, classFilter, statusFilter, move]);
+  const pg = pageOf(ordered, page);
+  const rows = pg.rows;
 
   const classMap = useMemo(() => Object.fromEntries(classes.map((c) => [c.id, c])), [classes]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-up" data-testid="students-page">
-      <PageHero title="Student directory" subtitle="Search every student, see their class and guardian, and open a profile with grades, attendance and fees."
+      <PageHero title={canEdit ? "Student directory" : "My children"} subtitle={canEdit ? "Search every student, see their class and guardian, and open a profile with grades, attendance and fees." : "Open a profile to see grades, attendance and fees."}
         actions={canEdit && (
           <button data-testid="add-student-btn" onClick={() => setShowForm(true)} className="ui-btn btn-primary">
             <Plus className="h-4 w-4" aria-hidden="true" /> New student
@@ -110,7 +120,7 @@ export default function StudentsPage() {
         </div>
       )}
 
-      <div className="ui-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+      {canEdit && <div className="ui-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
         <div className="relative md:col-span-2">
           <Search className="h-4 w-4 absolute left-3 top-3.5 text-slate-400" aria-hidden="true" />
           <input
@@ -132,7 +142,7 @@ export default function StudentsPage() {
           <option value="active">Active</option>
           <option value="left">Left</option>
         </select>
-      </div>
+      </div>}
 
       <div className="ui-card overflow-hidden">
         <div className="overflow-x-auto">
@@ -174,8 +184,8 @@ export default function StudentsPage() {
                   <td className="px-4 py-3">
                     {classMap[s.class_id] ? `${classMap[s.class_id].name} ${classMap[s.class_id].section || ""}` : "—"}
                   </td>
-                  <td className="px-4 py-3">{s.joining_date || "—"}</td>
-                  <td className="px-4 py-3">{s.leaving_date || "—"}</td>
+                  <td className="px-4 py-3">{formatDate(s.joining_date)}</td>
+                  <td className="px-4 py-3">{formatDate(s.leaving_date)}</td>
                   <td className="px-4 py-3">
                     <div>{s.guardian_name || "—"}</div>
                     <div className="text-xs text-slate-500">{s.guardian_phone}</div>
@@ -195,6 +205,7 @@ export default function StudentsPage() {
             </tbody>
           </table>
         </div>
+        <Pager total={ordered.length} page={pg.page} onPage={setPage} noun="students" />
       </div>
 
       {showForm && (

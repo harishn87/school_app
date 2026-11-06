@@ -1,29 +1,25 @@
 import { useMemo } from "react";
 import CountUp from "@/components/CountUp";
-import { formatMoney } from "@/lib/utils";
 
-/** Collection ring, paid / part paid / unpaid split, and money by term. Props: fees (already filtered to what is shown). */
+/** Collection ring, paid / part paid / unpaid split, . Props: fees (already filtered to what is shown). */
 export default function FeeInsights({ fees, view, onPick }) {
   const d = useMemo(() => {
     let due = 0, paid = 0;
     const st = { paid: 0, partial: 0, unpaid: 0 };
-    const terms = {};
     for (const f of fees) {
       const a = Number(f.amount || 0), p = Number(f.paid_amount || 0);
       due += a; paid += p;
       const k = f.status === "paid" ? "paid" : f.status === "partial" ? "partial" : "unpaid";
       st[k]++;
-      const t = terms[f.term] || (terms[f.term] = { term: f.term, due: 0, paid: 0 });
-      t.due += a; t.paid += p;
     }
-    return { due, paid, st, terms: Object.values(terms).sort((x, y) => x.term.localeCompare(y.term)), pct: due ? Math.round((paid / due) * 100) : 0 };
+    return { due, paid, st, pct: due ? Math.round((paid / due) * 100) : 0 };
   }, [fees]);
   if (fees.length === 0) return null;
   const n = fees.length;
   const R = 52, C = 2 * Math.PI * R;
   const rows = [["Paid", d.st.paid, "bg-emerald-500", "paid"], ["Part paid", d.st.partial, "bg-amber-400", "partial"], ["Unpaid", d.st.unpaid, "bg-rose-500", "unpaid"]];
   return (
-    <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)] gap-5" data-testid="fee-insights">
+    <div className="w-full" data-testid="fee-insights">
       <div className="ui-card p-5 flex items-center gap-5">
         <div className="relative h-32 w-32 shrink-0">
           <svg viewBox="0 0 128 128" className="h-full w-full -rotate-90" role="img" aria-label={`${d.pct}% of fees collected`}>
@@ -43,20 +39,6 @@ export default function FeeInsights({ fees, view, onPick }) {
               <div className="h-2 rounded-full bg-slate-100 overflow-hidden"><div className={`h-full rounded-full anim-grow ${c}`} style={{ width: `${(v / n) * 100}%` }} /></div>
             </button>
           ))}
-        </div>
-      </div>
-      <div className="ui-card p-5" data-testid="fee-terms">
-        <h3 className="font-heading font-semibold">By term</h3>
-        <div className="mt-3 space-y-3">
-          {d.terms.map((t) => {
-            const pc = t.due ? Math.round((t.paid / t.due) * 100) : 0;
-            return (
-              <div key={t.term}>
-                <div className="flex justify-between text-sm"><span className="font-medium">{t.term}</span><span className="text-slate-500 tabular-nums">{formatMoney(t.paid)} of {formatMoney(t.due)} · <b className="text-slate-800">{pc}%</b></span></div>
-                <div className="mt-1 h-2.5 rounded-full bg-[#E8ECFF] overflow-hidden"><div className="h-full rounded-full anim-grow bg-gradient-to-r from-[#2B4BFF] to-[#6C86FF]" style={{ width: `${pc}%` }} /></div>
-              </div>
-            );
-          })}
         </div>
       </div>
     </div>

@@ -104,6 +104,9 @@ async def ensure_tenant_indexes(db) -> None:
     await db.syllabus_log.create_index([("class_id", 1), ("term", 1), ("academic_year", 1), ("date", 1)], unique=True)
     await db.holidays.create_index("id", unique=True)
     await db.holidays.create_index("date")
+    await db.timetables.create_index("class_id", unique=True)
+    await db.exams.create_index("id", unique=True)
+    await db.exams.create_index([("class_id", 1), ("date", 1)])
 
 
 # --- Small in-process cache of school records (avoids a platform lookup on every request) ---

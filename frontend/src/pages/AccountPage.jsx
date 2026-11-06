@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Field, FormError } from "@/components/AuthShell";
+import PageHero from "@/components/PageHero";
 
 export default function AccountPage() {
   const { user } = useAuth();
@@ -24,11 +25,8 @@ export default function AccountPage() {
   };
 
   return (
-    <div className="max-w-xl mx-auto space-y-6 animate-fade-up" data-testid="account-page">
-      <header>
-        <h1 className="font-heading text-2xl sm:text-[28px] font-semibold tracking-tight">{user?.name}</h1>
-        <p className="text-slate-600 text-sm mt-1">{user?.email} · {user?.school?.name} (<span className="font-mono">{user?.school?.slug}</span>)</p>
-      </header>
+    <div className="max-w-2xl mx-auto space-y-6 animate-fade-up" data-testid="account-page">
+      <PageHero title={user?.name || "My account"} subtitle={`${user?.email || ""} · ${user?.school?.name || ""} (${user?.school?.slug || ""}) · ${user?.role || ""}`} />
       <form onSubmit={submit} className="ui-card p-6 space-y-4">
         <h2 className="font-heading text-xl font-semibold">Change password</h2>
         <Field label="Current password">

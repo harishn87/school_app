@@ -9,9 +9,11 @@ const pctOf = (m) => (m.max_score ? Math.round((m.score / m.max_score) * 100) : 
 /** Wheel with one wing per term; clicking a wing opens that term. */
 export function TermsWheel({ items, term, onTerm, title, sub, testid = "terms-wheel" }) {
   return (
-    <div className="ui-card p-5">
-      <h3 className="font-heading text-lg font-semibold">{title}</h3>
-      <p className="text-xs text-slate-500 mb-2">{sub}</p>
+    <div className="ui-card p-5 h-full">
+      <div className="min-h-[5rem]">
+        <h3 className="font-heading text-lg font-semibold">{title}</h3>
+        <p className="text-xs text-slate-500 mb-2">{sub}</p>
+      </div>
       <WagonWheel items={items} title="Mark by term" testid={testid} activeLabel={term} onSelect={(it) => onTerm(it.label)} hint="Click a term to open it." />
     </div>
   );
@@ -93,7 +95,6 @@ export function AcademicWheel({ report, classAvg, testid = "academic-wheel", nam
 }
 
 const TERM_ORDER = ["Term 1", "Term 2", "Term 3", "Annual"];
-const BANDS = [["Below 40%", 0, 40, "#D64550"], ["40 to 54%", 40, 55, "#D98E04"], ["55 to 69%", 55, 70, "#7C8FFF"], ["70 to 84%", 70, 85, "#2B4BFF"], ["85% and above", 85, 101, "#0E8F6E"]];
 const avg = (a) => (a.length ? Math.round(a.reduce((x, y) => x + y, 0) / a.length) : null);
 const delta = (d) => (d == null ? null : <span className={d >= 0 ? "text-emerald-700" : "text-rose-700"}>{d > 0 ? "+" : ""}{d}</span>);
 
@@ -127,13 +128,11 @@ function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm
     </div>
   );
   const TermsCard = (
-    <div data-testid="ca-trend"><TermsWheel items={TERM_ORDER.map((t) => ({ label: t, value: avg(allReports.filter((r) => r.term === t && r.percent != null).map((r) => r.percent)) }))}
+    <div data-testid="ca-trend" className="h-full"><TermsWheel items={TERM_ORDER.map((t) => ({ label: t, value: avg(allReports.filter((r) => r.term === t && r.percent != null).map((r) => r.percent)) }))}
       term={term} onTerm={onTerm} title="Class average by term" sub="Each wing is a term. Click one to open it. Striped wings have no marks yet." testid="class-terms-wheel" /></div>
   );
   const classAvg = avg(ranked.map((x) => x.pct));
   const passRate = ranked.length ? Math.round((ranked.filter((x) => x.pct >= 40).length / ranked.length) * 100) : null;
-  const dist = BANDS.map(([label, a, b, color]) => ({ label, color, n: ranked.filter((x) => x.pct >= a && x.pct < b).length }));
-  const maxN = Math.max(1, ...dist.map((d) => d.n));
   const trend = TERM_ORDER.map((t) => ({ t, v: avg(allReports.filter((r) => r.term === t && r.percent != null).map((r) => r.percent)) })).filter((x) => x.v != null);
   const strongest = (r) => { const m = (r.marks || []).filter((x) => x.score != null).map((x) => ({ n: x.subject, v: pctOf(x) })).sort((a, b) => b.v - a.v); return m.length ? [m[0], m[m.length - 1]] : [null, null]; };
 
@@ -165,22 +164,8 @@ function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-6 items-start">
-        <div className="space-y-6">
-          <div className="ui-card p-5" data-testid="ca-dist">
-            <h3 className="font-heading text-lg font-semibold">How the class is spread</h3>
-            <ul className="mt-3 space-y-2">
-              {dist.map((d) => (
-                <li key={d.label} className="grid grid-cols-[7.5rem_1fr_2rem] items-center gap-3 text-sm">
-                  <span className="text-slate-600">{d.label}</span>
-                  <span className="h-3 rounded-full bg-[#F1F4FF] overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${(d.n / maxN) * 100}%`, background: d.color }} /></span>
-                  <span className="tabular-nums text-right font-medium">{d.n}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <ClassSyllabusRing classId={classId} term={term} year={year} />
-        </div>
+      <div className="grid lg:grid-cols-2 gap-6 items-stretch">
+        <ClassSyllabusRing classId={classId} term={term} year={year} />
         {TermsCard}
       </div>
 
@@ -189,31 +174,39 @@ function ClassAnalysis({ students, termReports, term, allReports, onPick, onTerm
           <p className="text-xs text-slate-500">Click a student to see their own wheel.{subject && <> <button type="button" className="font-medium text-[#2B4BFF] hover:underline" onClick={() => setSubject(null)} data-testid="ca-clear-subject">Show overall ranking</button></>}</p></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm" data-testid="ca-ranking">
-            <thead><tr>
-              <th scope="col" className="table-head px-4 py-2.5 text-left">Rank</th>
-              <th scope="col" className="table-head px-4 py-2.5 text-left">Student</th>
-              {subject && <th scope="col" className="table-head px-4 py-2.5 text-right text-[#2B4BFF]">{subject}</th>}
-              <th scope="col" className="table-head px-4 py-2.5 text-right">Overall</th>
-              <th scope="col" className="table-head px-4 py-2.5 text-right">Vs class</th>
-              <th scope="col" className="table-head px-4 py-2.5 text-left">Strongest</th>
-              <th scope="col" className="table-head px-4 py-2.5 text-left">Needs attention</th>
+            <thead><tr className="surface-midnight text-white">
+              {[["Rank", "left", "w-20"], ["Student", "left", ""], ...(subject ? [[subject, "right", "text-[#E9C46A]"]] : []), ["Overall", "left", "min-w-[190px]"], ["Vs class", "center", ""], ["Strongest", "left", ""], ["Needs attention", "left", ""]].map(([h, al, cl]) => (
+                <th key={h} scope="col" className={`px-4 py-3 text-xs font-semibold uppercase tracking-wider text-white/80 text-${al} ${cl}`}>{h}</th>
+              ))}
             </tr></thead>
             <tbody className="divide-y divide-[#EEF0F6]">
               {ranked.map(({ s, r, pct }, i) => {
                 const [best, worst] = strongest(r);
                 const flag = pct < 40 || pct <= classAvg - 15;
+                const d = pct - classAvg;
+                const medal = ["from-[#F4D27A] to-[#D9A21B] text-[#5A3E00]", "from-[#E4E8F2] to-[#AEB7CC] text-[#2F3A52]", "from-[#F1C6A0] to-[#C58650] text-[#5A2F0B]"][i];
+                const bar = pct >= 75 ? "from-emerald-400 to-emerald-600" : pct >= 50 ? "from-[#6B86FF] to-[#2B4BFF]" : pct >= 35 ? "from-amber-300 to-amber-500" : "from-rose-400 to-rose-600";
+                const chip = (x, tone) => x ? <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${tone}`}>{x.n}<b className="font-heading font-semibold tabular-nums">{x.v}%</b></span> : <span className="text-slate-300">-</span>;
                 return (
-                  <tr key={s.id} className="cursor-pointer" onClick={() => onPick(s.id)} data-testid={`ca-row-${s.id}`}>
-                    <td className="px-4 py-2 tabular-nums text-slate-500">{i + 1}</td>
-                    <th scope="row" className="px-4 py-2 text-left font-medium">
-                      <button type="button" className="text-left hover:text-[#2B4BFF]" onClick={() => onPick(s.id)}>{s.first_name} {s.last_name}</button>
-                      {flag && <span className="pill bg-rose-50 text-rose-700 ml-2">Needs support</span>}
+                  <tr key={s.id} className="group cursor-pointer transition-colors hover:bg-[#F7F8FF]" onClick={() => onPick(s.id)} data-testid={`ca-row-${s.id}`}>
+                    <td className="px-4 py-2.5"><span className={`grid h-8 w-8 place-items-center rounded-full text-xs font-heading font-semibold tabular-nums ${medal ? `bg-gradient-to-br shadow-sm ${medal}` : "bg-[#F1F3FA] text-slate-500"}`}>{i + 1}</span></td>
+                    <th scope="row" className="px-4 py-2.5 text-left font-normal">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#2B4BFF] to-[#1B2A7A] text-[11px] font-semibold text-white" aria-hidden="true">{(s.first_name?.[0] || "") + (s.last_name?.[0] || "")}</span>
+                        <button type="button" className="text-left font-heading font-semibold text-[#0B1020] group-hover:text-[#2B4BFF]" onClick={() => onPick(s.id)}>{s.first_name} {s.last_name}</button>
+                        {flag && <span className="pill bg-rose-50 text-rose-700">Needs support</span>}
+                      </div>
                     </th>
-                    {subject && <td className="px-4 py-2 text-right tabular-nums font-semibold text-[#2B4BFF]" data-testid={`ca-subj-${s.id}`}>{subjPct(r) != null ? `${subjPct(r)}%` : "-"}</td>}
-                    <td className="px-4 py-2 text-right tabular-nums font-semibold">{pct}%</td>
-                    <td className="px-4 py-2 text-right tabular-nums">{delta(pct - classAvg)}</td>
-                    <td className="px-4 py-2 text-slate-600">{best ? `${best.n} ${best.v}%` : "-"}</td>
-                    <td className="px-4 py-2 text-slate-600">{worst && worst !== best ? `${worst.n} ${worst.v}%` : "-"}</td>
+                    {subject && <td className="px-4 py-2.5 text-right tabular-nums font-heading font-semibold text-[#2B4BFF]" data-testid={`ca-subj-${s.id}`}>{subjPct(r) != null ? `${subjPct(r)}%` : "-"}</td>}
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <span className="w-11 font-heading text-base font-semibold tabular-nums text-[#0B1020]">{pct}%</span>
+                        <span className="h-2 flex-1 overflow-hidden rounded-full bg-[#EEF0F6]" aria-hidden="true"><span className={`block h-full rounded-full bg-gradient-to-r ${bar}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} /></span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2.5 text-center"><span className={`inline-flex items-center gap-0.5 rounded-full px-2.5 py-1 text-xs font-semibold tabular-nums ${d >= 0 ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700"}`}><span aria-hidden="true">{d >= 0 ? "▲" : "▼"}</span>{d > 0 ? "+" : ""}{d}</span></td>
+                    <td className="px-4 py-2.5">{chip(best, "bg-emerald-50 text-emerald-800")}</td>
+                    <td className="px-4 py-2.5">{chip(worst && worst !== best ? worst : null, "bg-amber-50 text-amber-800")}</td>
                   </tr>
                 );
               })}

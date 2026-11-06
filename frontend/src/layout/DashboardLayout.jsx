@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { useLive } from "@/lib/live";
 import {
   LayoutDashboard, GraduationCap, Users, Wallet, CalendarCheck, LogOut, School, UserCog, CreditCard, KeyRound,
-  AlertTriangle, Award, BookOpenCheck, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart,
+  AlertTriangle, Award, BookOpenCheck, NotebookPen, FileText, Bus, PartyPopper, ClipboardList, PieChart, CalendarRange, ClipboardCheck,
 } from "lucide-react";
 
 const ALL_NAV = [
@@ -16,6 +16,8 @@ const ALL_NAV = [
   { to: "/app/classes", label: "Classes", icon: Users, testid: "nav-classes", group: "School", roles: ["admin", "teacher"] },
   { to: "/app/progress", label: "Academics", parentLabel: "Academics", icon: ClipboardList, testid: "nav-progress", group: "School" },
   { to: "/app/syllabus", label: "Syllabus", parentLabel: "Syllabus", icon: BookOpenCheck, testid: "nav-syllabus", group: "School" },
+  { to: "/app/timetable", label: "Timetable", icon: CalendarRange, testid: "nav-timetable", group: "School" },
+  { to: "/app/exams", label: "Exam schedule", parentLabel: "Exams", icon: ClipboardCheck, testid: "nav-exams", group: "School" },
   { to: "/app/fees", label: "Fees", icon: Wallet, testid: "nav-fees", group: "Office", roles: ["admin", "parent"] },
   { to: "/app/attendance", label: "Attendance", icon: CalendarCheck, testid: "nav-attendance", group: "Today" },
   { to: "/app/holidays", label: "Holidays", icon: PartyPopper, testid: "nav-holidays", group: "Today", roles: ["admin", "teacher"] },

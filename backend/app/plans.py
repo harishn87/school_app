@@ -8,8 +8,8 @@ from typing import Optional
 
 PLANS = {
     "trial": {"name": "Free trial", "max_students": 100, "max_staff": 10, "price_inr_month": 0, "price_inr_year": 0},
-    "basic": {"name": "Basic", "max_students": 500, "max_staff": 25, "price_inr_month": 2999, "price_inr_year": 29990},
-    "pro": {"name": "Pro", "max_students": 5000, "max_staff": 200, "price_inr_month": 7999, "price_inr_year": 79990},
+    "basic": {"name": "Basic", "max_students": 500, "max_staff": 25, "price_inr_month": 3499, "price_inr_year": 34990},
+    "pro": {"name": "Pro", "max_students": 1500, "max_staff": 100, "price_inr_month": 9999, "price_inr_year": 99990},
 }
 
 PLAN_IDS = tuple(PLANS.keys())

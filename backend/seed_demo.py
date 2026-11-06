@@ -237,7 +237,7 @@ def main():
 
     # Past-year attendance: every school day from mid June to the end of March (Sundays off), one request per day
     att_prop = {s["id"]: rnd.choice([.99, .97, .95, .93, .9, .85, .78]) for s in all_students}
-    for year, start, end in (("2024-25", date(2024, 6, 12), date(2025, 3, 28)), ("2025-26", date(2025, 6, 11), date(2026, 3, 28))):
+    for year, start, end in (("2024-25", date(2025, 3, 1), date(2025, 3, 3)),):
         if need(c.call("GET", f"/attendance?date={start.isoformat()}"), "check attendance"):
             continue
         day, n_days = start, 0
@@ -331,6 +331,33 @@ def main():
         while d0 <= d1:
             off.add(d0); d0 += timedelta(days=1)
 
+    # Timetable (8 periods with lunch) and a Term 2 exam schedule for every class
+    periods = [("09:00", "09:45"), ("09:45", "10:30"), ("10:30", "11:00"), ("11:00", "11:45"), ("11:45", "12:30"), ("12:30", "13:15"), ("13:15", "14:00"), ("14:00", "14:45")]
+    made_tt = made_ex = 0
+    for cn, cls in classes.items():
+        idx = CLASSES.index(cn)
+        subs = subjects_for(idx)
+        if not (c.call("GET", f"/timetable?class_id={cls['id']}")[1] or {}).get("exists"):
+            days = {}
+            for di, dname in enumerate(("Mon", "Tue", "Wed", "Thu", "Fri", "Sat")):
+                row = [subs[(di + p) % len(subs)] for p in range(8)]
+                row[2] = "Break"; row[5] = "Lunch"
+                if dname == "Sat":
+                    row[4:] = ["Games", "Library", "Art", ""]
+                days[dname] = row
+            need(c.call("PUT", f"/timetable/{cls['id']}", {"periods": [{"start": a, "end": b} for a, b in periods], "days": days}), f"timetable {cn}")
+            made_tt += 1
+        if not need(c.call("GET", f"/exams?class_id={cls['id']}"), "list exams"):
+            start = date.today() + timedelta(days=6 + idx % 4)
+            d0, k = start, 0
+            while k < len(subs):
+                if d0.weekday() != 6 and d0 not in off:
+                    need(c.call("POST", "/exams", {"class_id": cls["id"], "term": "Term 2", "subject": subs[k], "date": d0.isoformat(), "start_time": "09:30",
+                                                    "duration_min": 90, "room": f"Room {idx + 1}", "note": "Bring your own stationery." if k == 0 else None}), f"exam {cn} {subs[k]}")
+                    k += 1; made_ex += 1
+                d0 += timedelta(days=1)
+    print(f"Timetable set for {made_tt} classes; {made_ex} exams scheduled.")
+
     # This month's attendance up to today (skips Sundays and holidays)
     students = need(c.call("GET", "/students"), "list students")
     today = date.today()
@@ -344,6 +371,19 @@ def main():
             days += 1
         d += timedelta(days=1)
     print(f"Attendance marked for {days} school days this month.")
+    # Subjects: a different teacher takes each subject (skipped for classes that already have them)
+    tlist = sorted([u for u in need(c.call("GET", "/users"), "list users") if u["role"] == "teacher"], key=lambda u: u["email"])
+    done = 0
+    for i, cl in enumerate(sorted(need(c.call("GET", "/classes"), "list classes"), key=lambda x: x["name"])):
+        if cl.get("subjects") or not tlist:
+            continue
+        names = ["English", "Numbers", "Drawing"] if cl["name"] in ("PP1", "PP2") else ["Maths", "English", "Science", "Social"]
+        subs = [{"name": n, "teacher_id": (tlist[(i + k) % len(tlist)]["id"] if k else cl.get("teacher_id"))} for k, n in enumerate(names)]
+        body = {k: cl.get(k) for k in ("name", "section", "teacher_id", "secondary_teacher_id", "attender_name", "attender_phone", "academic_year")}
+        body["subjects"] = subs
+        if c.call("PUT", f"/classes/{cl['id']}", body)[0] == 200:
+            done += 1
+    print(f"Subject teachers set for {done} classes.")
     print("\nDone.\n  Admin  : %s / %s  (school code %s)\n  Teacher: %s / %s  (Class 3 and Class 4)\n  Parent : %s / %s  (two children: Aarav Reddy, Class 3 and Ananya Reddy, Class 7)"
           % (A.admin, A.password, A.school, TEACHER_EMAIL, TEACHER_PASSWORD, PARENT_EMAIL, PARENT_PASSWORD))
 

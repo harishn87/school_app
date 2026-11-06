@@ -17,6 +17,8 @@ import AccountPage from "@/pages/AccountPage";
 import DiaryPage from "@/pages/DiaryPage";
 import LettersPage from "@/pages/LettersPage";
 import HolidaysPage from "@/pages/HolidaysPage";
+import TimetablePage from "@/pages/TimetablePage";
+import ExamsPage from "@/pages/ExamsPage";
 import ManagementDashboard from "@/pages/ManagementDashboard";
 import ClassDetailPage from "@/pages/ClassDetailPage";
 import ProgressPage from "@/pages/ProgressPage";
@@ -87,6 +89,8 @@ export default function App() {
             <Route path="syllabus" element={<SyllabusPage />} />
             <Route path="staff" element={<RoleOnly roles={["admin"]}><StaffPerformancePage /></RoleOnly>} />
             <Route path="management" element={<RoleOnly roles={["admin"]}><ManagementDashboard /></RoleOnly>} />
+            <Route path="timetable" element={<TimetablePage />} />
+            <Route path="exams" element={<ExamsPage />} />
             <Route path="holidays" element={<RoleOnly roles={["admin", "teacher"]}><HolidaysPage /></RoleOnly>} />
             <Route path="letters" element={<RoleOnly roles={["admin"]}><LettersPage /></RoleOnly>} />
             <Route path="billing" element={<RoleOnly roles={["admin"]}><BillingPage /></RoleOnly>} />

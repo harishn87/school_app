@@ -6,6 +6,7 @@ import { Plus, Trash2, PartyPopper } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { formatDate } from "@/lib/utils";
+import YearSelect from "@/components/YearSelect";
 
 export default function HolidaysPage() {
   const { user } = useAuth();
@@ -38,10 +39,9 @@ export default function HolidaysPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fade-up" data-testid="holidays-page">
-      <PageHero title="Holidays" subtitle="Parents see these on their child's attendance calendar. Sundays are shown as off automatically."
-        actions={<select className="ui-input !w-auto" value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year" data-testid="holiday-year">
-          {[year - 1, year, year + 1].filter((v, i, a) => a.indexOf(v) === i).map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>} />
+      <PageHero title="Holidays" subtitle="Parents see these on their child's attendance calendar. Sundays are shown as off automatically." />
+
+      <YearSelect years={[year - 1, year, year + 1].filter((v, i, a) => a.indexOf(v) === i).map(String)} current={String(new Date().getFullYear())} value={String(year)} onChange={(y) => setYear(Number(y))} id="holiday-year" label="Calendar year" />
 
       {admin && (
         <form onSubmit={add} className="ui-card p-5 grid sm:grid-cols-[1fr_auto_auto_auto] gap-3 items-end" data-testid="holiday-form">

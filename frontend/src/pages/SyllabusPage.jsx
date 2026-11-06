@@ -59,7 +59,19 @@ function TrendChart({ log, start, end, target }) {
 const PERIODS = ["Term 1", "Term 2", "Term 3", "Whole year"];
 const DOT = { green: "bg-emerald-500", amber: "bg-amber-400", red: "bg-rose-500", none: "bg-slate-300" };
 const TINT = { green: "border-l-emerald-500 bg-emerald-50/40", amber: "border-l-amber-400 bg-amber-50/40", red: "border-l-rose-500 bg-rose-50/40", none: "border-l-slate-300" };
-const daysLeft = (end) => Math.max(0, Math.ceil((new Date(`${end}T00:00:00`) - new Date(`${iso(new Date())}T00:00:00`)) / 86400000));
+
+const GRAD = { green: "from-emerald-400 to-emerald-600", amber: "from-amber-300 to-amber-500", red: "from-rose-400 to-rose-600", none: "from-slate-300 to-slate-400" };
+const TOP = { green: "from-emerald-400 via-emerald-500 to-teal-500", amber: "from-amber-300 to-orange-400", red: "from-rose-400 to-rose-600", none: "from-slate-200 to-slate-300" };
+/** Thick progress bar with a labelled target tick. */
+function GoalBar({ percent, target, status }) {
+  const p = Math.min(100, Math.max(0, percent || 0)), tg = Math.min(100, Math.max(0, target || 0));
+  return (
+    <div className="relative pt-1" role="img" aria-label={`${p}% covered, target ${tg}%`}>
+      <div className="h-2.5 overflow-hidden rounded-full bg-[#EEF0F6]"><div className={`h-full rounded-full bg-gradient-to-r anim-grow ${GRAD[status] || GRAD.none}`} style={{ width: `${p}%` }} /></div>
+      <div className="absolute top-0 h-[18px] w-0.5 rounded bg-[#0B1020]" style={{ left: `calc(${tg}% - 1px)` }} title={`Target ${tg}%`} />
+    </div>
+  );
+}const daysLeft = (end) => Math.max(0, Math.ceil((new Date(`${end}T00:00:00`) - new Date(`${iso(new Date())}T00:00:00`)) / 86400000));
 
 /** Donut showing how much is covered, with a tick where the term's pace says it should be. */
 function Gauge({ pct, target, status }) {
@@ -318,17 +330,24 @@ export default function SyllabusPage() {
               ? <RagRing testid="syl-wheel" items={live.subs.map((x) => ({ key: x.name, label: x.name, percent: x.pct, target: live.tgt, status: gradeOf(x.pct, live.tgt), has: true }))} period={term} centreLabel="Covered" noun="subjects" maxWidth={380} hint="Hover a subject for details." />
               : <ul className="space-y-3">{live.subs.map((x) => <li key={x.name}><div className="flex justify-between text-sm"><span className="font-medium">{x.name}</span><span className="tabular-nums">{x.pct}%</span></div><PaceBar percent={x.pct} target={live.tgt} status={gradeOf(x.pct, live.tgt)} thin /></li>)}</ul>}
           </section>
-          <section className="ui-card p-5" data-testid="syl-attention">
-            <h3 className="font-heading text-lg font-semibold">Needs attention first</h3>
-            <p className="text-xs text-slate-500 mb-3">Subjects ordered by how far they are from today&apos;s target.</p>
-            <ul className="space-y-2.5">
-              {[...live.subs].sort((a, b) => (a.pct - live.tgt) - (b.pct - live.tgt)).map((x) => {
-                const g = x.pct - live.tgt, st = gradeOf(x.pct, live.tgt);
+          <section className="ui-card overflow-hidden" data-testid="syl-attention">
+            <div className="surface-midnight px-5 py-4 text-white">
+              <h3 className="font-heading text-lg font-semibold">Needs attention first</h3>
+              <p className="text-xs text-white/65">Subjects ordered by how far they are from today&apos;s target.</p>
+            </div>
+            <ul className="space-y-3 p-4">
+              {[...live.subs].sort((a, b) => (a.pct - live.tgt) - (b.pct - live.tgt)).map((x, n) => {
+                const g = x.pct - live.tgt, st = gradeOf(x.pct, live.tgt), R = RAG[st] || RAG.none;
                 return (
-                  <li key={x.name} className={`rounded-xl border-l-4 px-3.5 py-2.5 ${TINT[st]}`}>
-                    <div className="flex items-center justify-between gap-2"><span className="font-medium">{x.name}{who(x.name) && <span className="font-normal text-xs text-slate-500"> · {who(x.name)}</span>}</span>
-                      <span className={`text-sm font-semibold tabular-nums ${(RAG[st] || RAG.none).text}`}>{g >= 0 ? `${g} pts ahead` : `${-g} pts behind`}</span></div>
-                    <div className="mt-1.5"><PaceBar percent={x.pct} target={live.tgt} status={st} thin /></div>
+                  <li key={x.name} className="rounded-2xl border border-[#E6E9F4] bg-white p-3.5 shadow-sm transition-shadow hover:shadow-md">
+                    <div className="flex items-center gap-3">
+                      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br font-heading text-sm font-semibold text-white ${GRAD[st] || GRAD.none}`} aria-hidden="true">{n + 1}</span>
+                      <div className="min-w-0 flex-1 leading-tight"><div className="truncate font-heading font-semibold text-[#0B1020]">{x.name}</div>
+                        {who(x.name) && <div className="truncate text-xs text-slate-500">{who(x.name)}</div>}</div>
+                      <span className={`pill border text-xs font-semibold tabular-nums px-2.5 py-1 whitespace-nowrap ${R.soft}`}>{g === 0 ? "On target" : g > 0 ? `${g} pts ahead` : `${-g} pts behind`}</span>
+                    </div>
+                    <div className="mt-3 flex items-center gap-3"><div className="flex-1"><GoalBar percent={x.pct} target={live.tgt} status={st} /></div>
+                      <span className="w-10 text-right font-heading text-sm font-semibold tabular-nums text-[#0B1020]">{x.pct}%</span></div>
                   </li>);
               })}
             </ul>
@@ -347,14 +366,18 @@ export default function SyllabusPage() {
             const st = gradeOf(s.pct, live.tgt);
             const teacherRole = isTeacher, teacher = isTeacher && canEdit(s.name);
             return (
-              <article key={s.name} className={`ui-card p-5 border-l-4 ${TINT[st]}`} data-testid={`syl-subject-${s.name}`}>
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div><h3 className="font-heading text-lg font-semibold">{s.name}</h3>
-                    {who(s.name) && <div className="text-xs text-slate-500" data-testid={`syl-teacher-${s.name}`}>Taught by {who(s.name)}{teacherRole && !teacher ? " · view only" : ""}</div>}</div>
+              <article key={s.name} className="ui-card relative overflow-hidden p-5 pt-6" data-testid={`syl-subject-${s.name}`}>
+                <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${TOP[st] || TOP.none}`} aria-hidden="true" />
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br font-heading text-lg font-semibold text-white shadow-sm ${GRAD[st] || GRAD.none}`} aria-hidden="true">{s.name.slice(0, 1).toUpperCase()}</span>
+                    <div><h3 className="font-heading text-lg font-semibold leading-tight">{s.name}</h3>
+                    {who(s.name) && <div className="text-xs text-slate-500" data-testid={`syl-teacher-${s.name}`}>Taught by {who(s.name)}{teacherRole && !teacher ? " · view only" : ""}</div>}</div></div>
                   <div className="flex items-center gap-3"><span className={`font-heading text-2xl font-semibold tabular-nums ${(RAG[st] || RAG.none).text}`} data-testid={`syl-subject-pct-${s.name}`}>{s.pct}%</span><RagPill status={st} />
                     {teacher && <button type="button" className="ui-btn !px-2.5 !py-2 text-red-600" aria-label={`Remove ${s.name}`} onClick={() => { if (window.confirm(`Remove ${s.name} from this term's syllabus?`)) edit((d) => d.subjects.splice(i, 1)); }}><Trash2 className="h-4 w-4" aria-hidden="true" /></button>}</div>
                 </div>
-                <div className="mt-3"><PaceBar percent={s.pct} target={live.tgt} status={st} thin /></div>
+                <div className="mt-4"><GoalBar percent={s.pct} target={live.tgt} status={st} />
+                  <div className="mt-1.5 flex justify-between text-[11px] font-medium text-slate-500"><span>Covered {s.pct}%</span><span>Target today {live.tgt}%</span></div></div>
 
                 {s.chapters.length === 0 ? (
                   <div className="mt-4"><div className="text-xs text-slate-500 mb-1">{teacher ? "Drag to set how much of this subject is covered, or add chapters to track them one by one." : ""}</div>
@@ -362,8 +385,8 @@ export default function SyllabusPage() {
                 ) : !teacher ? (
                   <ul className="mt-4 flex flex-wrap gap-2" data-testid={`syl-chips-${s.name}`}>
                     {s.chapters.map((c, j) => (
-                      <li key={j} className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium ${c.percent >= 100 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : c.percent > 0 ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-slate-50 text-slate-500"}`} data-testid={`syl-chapter-${s.name}-${j}`}>
-                        {c.percent >= 100 ? <Check className="h-3.5 w-3.5" aria-hidden="true" /> : <span className="tabular-nums">{c.percent}%</span>}{c.title}
+                      <li key={j} className={`inline-flex items-center gap-2 rounded-full border py-1 pl-1.5 pr-3 text-xs font-medium ${c.percent >= 100 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : c.percent > 0 ? "border-amber-200 bg-amber-50 text-amber-900" : "border-slate-200 bg-[#F7F8FC] text-slate-500"}`} data-testid={`syl-chip-${s.name}-${j}`}>
+                        <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-semibold tabular-nums ${c.percent >= 100 ? "bg-emerald-500 text-white" : c.percent > 0 ? "bg-amber-400 text-white" : "bg-slate-200 text-slate-500"}`}>{c.percent >= 100 ? <Check className="h-3 w-3" aria-hidden="true" /> : `${c.percent}%`}</span>{c.title}
                       </li>
                     ))}
                   </ul>

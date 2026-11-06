@@ -18,15 +18,15 @@ export default function ClassSyllabusRing({ classId, term, year }) {
   const subjects = doc?.subjects || [];
   const items = subjects.map((s) => ({ key: s.name, label: s.name, percent: s.percent, target: doc.target, status: s.status, has: true }));
   return (
-    <div className="ui-card p-5" data-testid="class-syllabus-ring">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <div className="ui-card p-5 flex h-full flex-col" data-testid="class-syllabus-ring">
+      <div className="flex flex-wrap items-start justify-between gap-2 min-h-[5rem]">
         <div>
           <h3 className="font-heading text-lg font-semibold">Syllabus coverage</h3>
           <p className="text-xs text-slate-500">Share of each subject covered, {term}. Target today is {doc?.target ?? "-"}%.</p>
         </div>
         {doc?.exists && <RagPill status={doc.status} testid="csr-status" />}
       </div>
-      <div className="mt-3">
+      <div className="mt-6 flex flex-1 flex-col">
         {failed ? <p className="text-sm text-slate-500">Syllabus isn&apos;t available for this class.</p>
           : !doc ? <p className="text-sm text-slate-500">Loading…</p>
           : !doc.exists || subjects.length === 0 ? (
@@ -34,7 +34,7 @@ export default function ClassSyllabusRing({ classId, term, year }) {
           ) : subjects.length < 3 ? (
             <ul className="space-y-3">{subjects.map((s) => <li key={s.name}><div className="flex justify-between text-sm"><span className="font-medium">{s.name}</span><span className="tabular-nums">{s.percent}%</span></div><PaceBar percent={s.percent} target={doc.target} status={s.status} thin /></li>)}</ul>
           ) : (
-            <RagRing testid="csr-wheel" items={items} period={term} centreLabel="Covered" noun="subjects" maxWidth={440}
+            <RagRing testid="csr-wheel" items={items} period={term} centreLabel="Covered" noun="subjects" maxWidth={522}
               hint={`Overall ${doc.percent}% against a target of ${doc.target}%, ${RAG[doc.status].label.toLowerCase()}.`} />
           )}
       </div>
