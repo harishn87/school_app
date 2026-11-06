@@ -185,22 +185,22 @@ function StaffProgress() {
 
       {view === "analysis" && <StaffAnalysis classId={classId} students={students} term={term} onTerm={setTerm} canEnter={canEnter} lead={<>{classField}{termField}</>} year={year} cols={4} />}
 
-      {view === "marks" && <div className="ui-card overflow-x-auto">
+      {view === "marks" && <div className="ui-card overflow-x-auto !rounded-2xl">
         <table className="w-full text-sm" data-testid="progress-table">
           <thead>
-            <tr>
-              <th scope="col" className="table-head px-4 py-2.5 text-left sticky left-0 bg-[#F8F9FD] z-10">Student</th>
+            <tr className="surface-midnight text-white">
+              <th scope="col" className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-white/80 sticky left-0 z-10 bg-[#0B1020]">Student</th>
               {subjects.map((sub) => (
-                <th key={sub} scope="col" className="table-head px-2 py-2 text-left min-w-[96px]">
-                  <div className="flex items-center gap-1">{sub}
-                    <button type="button" onClick={() => removeSubject(sub)} className="text-slate-400 hover:text-red-600" aria-label={`Remove ${sub}`}><X className="h-3 w-3" aria-hidden="true" /></button></div>
-                  <label className="flex items-center gap-1 text-[11px] font-normal text-slate-500">out of
-                    <input type="number" min="1" className="w-12 rounded border border-[#DDE1EE] px-1 py-0.5 text-xs" value={maxes[sub] ?? 100} aria-label={`${sub} maximum marks`}
+                <th key={sub} scope="col" className="px-2 py-3 text-left min-w-[104px]">
+                  <div className="flex items-center gap-1 font-heading text-sm font-semibold text-white">{sub}
+                    <button type="button" onClick={() => removeSubject(sub)} className="text-white/50 hover:text-rose-300" aria-label={`Remove ${sub}`}><X className="h-3 w-3" aria-hidden="true" /></button></div>
+                  <label className="mt-1 flex items-center gap-1 text-[11px] font-normal text-white/60">out of
+                    <input type="number" min="1" className="w-12 rounded-md border border-white/20 bg-white/10 px-1 py-0.5 text-xs text-white focus:outline-none focus:border-[#E9C46A]" value={maxes[sub] ?? 100} aria-label={`${sub} maximum marks`}
                       onChange={(e) => { setMaxes({ ...maxes, [sub]: e.target.value }); setDirty(true); }} /></label>
                 </th>
               ))}
-              <th scope="col" className="table-head px-3 py-2.5 text-right">Overall</th>
-              <th scope="col" className="table-head px-3 py-2.5 text-left min-w-[220px]">Teacher&apos;s remark</th>
+              <th scope="col" className="px-3 py-3 text-right text-xs font-semibold uppercase tracking-wider text-white/80">Overall</th>
+              <th scope="col" className="px-3 py-3 text-left min-w-[220px] text-xs font-semibold uppercase tracking-wider text-white/80">Teacher&apos;s remark</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEF0F6]">
@@ -208,23 +208,33 @@ function StaffProgress() {
             {students.map((s) => {
               const pct = rowPct(s.id);
               return (
-                <tr key={s.id} data-testid={`progress-row-${s.id}`}>
-                  <td className="px-4 py-2 sticky left-0 bg-white z-10 whitespace-nowrap">
-                    <span className="text-xs text-slate-400 mr-2 tabular-nums">{s.roll_number}</span><span className="font-medium">{s.first_name} {s.last_name}</span>
+                <tr key={s.id} data-testid={`progress-row-${s.id}`} className="group hover:bg-[#F7F8FF]">
+                  <td className="px-4 py-2 sticky left-0 bg-white group-hover:bg-[#F7F8FF] z-10 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <span className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-[#2B4BFF] to-[#1B2A7A] text-[11px] font-semibold text-white" aria-hidden="true">{(s.first_name?.[0] || "") + (s.last_name?.[0] || "")}</span>
+                      <div className="leading-tight"><div className="font-heading font-semibold text-[#0B1020]">{s.first_name} {s.last_name}</div><div className="text-[11px] text-slate-400 tabular-nums">Roll {s.roll_number}</div></div>
+                    </div>
                   </td>
                   {subjects.map((sub, i) => {
                     const bad = invalid.has(`${s.id}|${sub}`);
+                    const raw = scores[s.id]?.[sub], mx = Number(maxes[sub] ?? 100) || 100;
+                    const mp = raw === "" || raw == null || Number.isNaN(Number(raw)) ? null : (Number(raw) / mx) * 100;
+                    const tint = mp == null ? "border-[#DDE1EE] bg-white" : mp >= 75 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : mp >= 50 ? "border-[#CBD3FF] bg-[#EEF1FF] text-[#1B2A7A]" : mp >= 35 ? "border-amber-200 bg-amber-50 text-amber-800" : "border-rose-200 bg-rose-50 text-rose-700";
                     return (
                       <td key={sub} className="px-2 py-1.5">
                         <input type="number" inputMode="decimal" min="0" step="any" value={scores[s.id]?.[sub] ?? ""} onChange={(e) => setScore(s.id, sub, e.target.value)}
                           aria-label={`${s.first_name} ${sub} marks`} data-testid={`score-${s.id}-${i}`}
-                          className={`w-20 rounded-lg border px-2 py-1.5 tabular-nums ${bad ? "border-red-400 bg-red-50" : "border-[#DDE1EE]"}`} />
+                          className={`w-20 rounded-xl border px-2 py-1.5 text-center font-heading font-semibold tabular-nums transition-colors focus:outline-none focus:ring-4 focus:ring-[#2B4BFF]/15 focus:border-[#2B4BFF] ${bad ? "border-red-400 bg-red-50 text-red-700" : tint}`} />
                       </td>
                     );
                   })}
-                  <td className="px-3 py-2 text-right tabular-nums font-medium">{pct == null ? "-" : `${pct}%`}</td>
+                  <td className="px-3 py-2 text-right">
+                    {pct == null ? <span className="text-slate-300">-</span> : (
+                      <span className={`inline-block min-w-[3.5rem] rounded-full px-3 py-1 text-center font-heading text-sm font-semibold tabular-nums ${pct >= 75 ? "bg-emerald-50 text-emerald-700" : pct >= 50 ? "bg-[#EEF1FF] text-[#2B4BFF]" : pct >= 35 ? "bg-amber-50 text-amber-700" : "bg-rose-50 text-rose-700"}`}>{pct}%</span>
+                    )}
+                  </td>
                   <td className="px-3 py-1.5">
-                    <input className="ui-input !py-1.5" maxLength={500} placeholder="Optional" value={remarks[s.id] ?? ""} aria-label={`${s.first_name} remark`} data-testid={`remark-${s.id}`}
+                    <input className="ui-input !rounded-xl !bg-[#F8F9FF] !py-1.5" maxLength={500} placeholder="Optional" value={remarks[s.id] ?? ""} aria-label={`${s.first_name} remark`} data-testid={`remark-${s.id}`}
                       onChange={(e) => { setRemarks({ ...remarks, [s.id]: e.target.value }); setDirty(true); }} />
                   </td>
                 </tr>

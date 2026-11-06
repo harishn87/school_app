@@ -254,9 +254,17 @@ def test_student_notes(server, new_client):
     assert x["other"].get(f"/api/students/{kid['id']}/notes").status_code == 404
     assert x["other"].post(f"/api/students/{kid['id']}/notes", json={"body": "hi"}).status_code == 404
     assert t1.post(f"/api/students/{kid['id']}/notes", json={"body": "Yes, after school on Tuesdays."}).status_code == 201
-    assert t1.get("/api/student-notes/inbox").json()[0]["answered"] is True
+    assert t1.get("/api/student-notes/inbox").json() == []      # a reply takes it off the list
+    # marking read also clears one that hasn't been answered
+    q2 = mom.post(f"/api/students/{kid['id']}/notes", json={"body": "Also, when is the PTM?"}).json()
+    assert [i["body"] for i in t1.get("/api/student-notes/inbox").json()] == ["Also, when is the PTM?"]
+    assert x["t2"].post(f"/api/student-notes/{q2['id']}/read").status_code == 403
+    assert mom.post(f"/api/student-notes/{q2['id']}/read").status_code == 403
+    assert t1.post(f"/api/student-notes/{q2['id']}/read").status_code == 200
+    assert t1.get("/api/student-notes/inbox").json() == []
+    assert t1.delete(f"/api/student-notes/{q2['id']}").status_code == 403
     assert mom.get("/api/student-notes/inbox").status_code == 403
-    mine = next(n for n in mom.get(f"/api/students/{kid['id']}/notes").json() if n["from_role"] == "parent")
+    mine = next(n for n in mom.get(f"/api/students/{kid['id']}/notes").json() if n["from_role"] == "parent" and n["id"] != q2["id"])
     assert mom.delete(f"/api/student-notes/{notes[-1]['id']}").status_code == 403
     assert mom.delete(f"/api/student-notes/{mine['id']}").status_code == 200
     assert t1.delete(f"/api/student-notes/{notes[-1]['id']}").status_code == 200

@@ -118,17 +118,17 @@ export default function FeesPage() {
         </div>
       )}
 
-      <ChildPicker kids={parentMulti ? students : []} value={pickedKid} onPick={pickKid} />
       <YearSelect chips years={ys.years} current={ys.current} value={activeYear} onChange={setYear} />
+      <ChildPicker kids={parentMulti ? students : []} value={pickedKid} onPick={pickKid} />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-        <SummaryCard label="Total billed" value={totals.due} color="bg-[#2B4BFF]" active={!view} onClick={() => setView("")} testid="sum-billed" hint="All records" />
-        <SummaryCard label="Collected" value={totals.paid} color="bg-emerald-500" active={view === "collected"} onClick={() => setView("collected")} testid="sum-collected" hint="Who has paid" />
-        <SummaryCard label="Pending" value={totals.pending} color="bg-[#E9C46A]" active={view === "pending"} onClick={() => setView("pending")} testid="sum-pending" hint="All unpaid dues" />
+        <SummaryCard label="Total billed" value={totals.due} color="bg-[#2B4BFF]" active={!view} onClick={() => setView("")} testid="sum-billed" hint="All records" plain={!isAdmin} />
+        <SummaryCard label="Paid" value={totals.paid} color="bg-emerald-500" active={view === "collected"} onClick={() => setView("collected")} testid="sum-collected" hint="Who has paid" plain={!isAdmin} />
+        <SummaryCard label="Pending" value={totals.pending} color="bg-[#E9C46A]" active={view === "pending"} onClick={() => setView("pending")} testid="sum-pending" hint="All unpaid dues" plain={!isAdmin} />
       </div>
 
       <section aria-label="Fees by term" data-testid="fees-by-term">
-        <h2 className="font-heading font-semibold mb-3">{isAdmin ? "Collected by term" : "Paid and pending by term"}</h2>
+        <h2 className="font-heading font-semibold mb-3">Paid and pending by term</h2>
         {!isAdmin && students.length > 1 && !sid ? (
           <div className="space-y-5">
             {students.map((s) => {
@@ -254,15 +254,16 @@ function StatusBadge({ status }) {
   );
 }
 
-function SummaryCard({ label, value, color, active, onClick, testid, hint }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={active} data-testid={testid}
-      className={`ui-card hoverable p-5 flex gap-4 text-left w-full ${active ? "ring-2 ring-[#2B4BFF]" : ""}`}>
-      <span className={`w-1.5 rounded-full shrink-0 ${color}`} aria-hidden="true" />
-      <div><div className="text-sm text-slate-500">{label} <span className="text-[11px] text-[#2B4BFF]">· {hint}</span></div>
-      <div className="font-heading text-3xl font-semibold tracking-tight mt-0.5 tabular-nums"><CountUp value={value} format={formatMoney} /></div></div>
-    </button>
-  );
+function SummaryCard({ label, value, color, active, onClick, testid, hint, plain }) {
+  const body = (<>
+    <span className={`w-1.5 rounded-full shrink-0 ${color}`} aria-hidden="true" />
+    <div><div className="text-sm text-slate-500">{label}</div>
+    <div className="font-heading text-3xl font-semibold tracking-tight mt-0.5 tabular-nums"><CountUp value={value} format={formatMoney} /></div></div>
+  </>);
+  return plain
+    ? <div data-testid={testid} className="ui-card p-5 flex gap-4 text-left w-full">{body}</div>
+    : <button type="button" onClick={onClick} aria-pressed={active} data-testid={testid}
+        className={`ui-card hoverable p-5 flex gap-4 text-left w-full ${active ? "ring-2 ring-[#2B4BFF]" : ""}`}>{body}</button>;
 }
 
 function Field({ label, children }) {

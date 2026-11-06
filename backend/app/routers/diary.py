@@ -169,10 +169,10 @@ async def list_student_notes(student_id: str, ctx: TenantContext = Depends(get_c
 @router.get("/student-notes/inbox")
 async def student_notes_inbox(ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
     """Latest messages parents have sent about children in the teacher's classes (the school's classes for an admin)."""
-    q: dict = {"from_role": "parent"}
+    q: dict = {"from_role": "parent", "read_at": {"$exists": False}}
     if ctx.role == "teacher":
         q["class_id"] = {"$in": await teacher_class_ids(ctx)}
-    rows = await ctx.db.student_notes.find(q, {"_id": 0}).sort("created_at", -1).to_list(15)
+    rows = await ctx.db.student_notes.find(q, {"_id": 0}).sort("created_at", -1).to_list(40)
     kids = {k["id"]: k async for k in ctx.db.students.find({"id": {"$in": [r["student_id"] for r in rows]}}, {"_id": 0, "id": 1, "first_name": 1, "last_name": 1})}
     classes = {c["id"]: c async for c in ctx.db.classes.find({}, {"_id": 0, "id": 1, "name": 1, "section": 1})}
     out = []
@@ -182,7 +182,17 @@ async def student_notes_inbox(ctx: TenantContext = Depends(require_roles("admin"
         later = await ctx.db.student_notes.count_documents({"student_id": r["student_id"], "from_role": "teacher", "created_at": {"$gt": r["created_at"]}})
         out.append({**r, "student_name": f"{k['first_name']} {k.get('last_name', '')}".strip() if k else "", "answered": later > 0,
                     "class_name": f"{c['name']} {c.get('section') or ''}".strip() if c else None})
-    return out
+    return [o for o in out if not o["answered"]][:15]     # a reply or "mark read" takes a message off the list
+
+
+@router.post("/student-notes/{note_id}/read")
+async def mark_student_note_read(note_id: str, ctx: TenantContext = Depends(require_roles("admin", "teacher"))):
+    n = await ctx.db.student_notes.find_one({"id": note_id, "from_role": "parent"}, {"_id": 0})
+    if not n:
+        raise HTTPException(status_code=404, detail="Message not found")
+    await _student_for_notes(ctx, n["student_id"], write=True)
+    await ctx.db.student_notes.update_one({"id": note_id}, {"$set": {"read_at": now_iso()}})
+    return {"ok": True}
 
 
 @router.delete("/student-notes/{note_id}")
